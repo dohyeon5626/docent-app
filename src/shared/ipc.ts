@@ -24,6 +24,7 @@ export const IPC = {
   getConversation: 'data:get-conversation',
   clearConversation: 'data:clear-conversation',
   readPdf: 'data:read-pdf',
+  exportSummaryPdf: 'data:export-summary-pdf',
 
   // Learning
   askQuestion: 'learn:ask',

@@ -91,6 +91,7 @@ const ko = {
   'menu.separate': '별도 창으로 분리',
   'menu.mergeWin': '창 합치기',
   'menu.rebuild': '요약 다시 만들기',
+  'menu.exportPdf': '요약본 PDF로 내보내기',
   'menu.allProjects': '프로젝트 목록',
   'menu.fitH': '높이에 맞추기',
   'menu.fitW': '폭에 맞추기',
@@ -109,7 +110,9 @@ const ko = {
   'settings.claudeModel': 'Claude 모델',
   'settings.modelDefault': '기본값',
   'settings.modelHint': '기본값은 CLI의 설정을 따릅니다. Opus는 품질이 높지만 느리고 사용량을 더 씁니다.',
-  'list.retry': '재시도'
+  'list.retry': '재시도',
+  'study.exporting': 'PDF로 내보내는 중…',
+  'study.exportFailed': 'PDF 내보내기에 실패했습니다'
 }
 
 const en: Record<keyof typeof ko, string> = {
@@ -195,6 +198,7 @@ const en: Record<keyof typeof ko, string> = {
   'menu.separate': 'Open in Separate Window',
   'menu.mergeWin': 'Merge Windows',
   'menu.rebuild': 'Rebuild Summary',
+  'menu.exportPdf': 'Export Summary as PDF',
   'menu.allProjects': 'All Projects',
   'menu.fitH': 'Fit to Height',
   'menu.fitW': 'Fit to Width',
@@ -213,7 +217,9 @@ const en: Record<keyof typeof ko, string> = {
   'settings.claudeModel': 'Claude model',
   'settings.modelDefault': 'Default',
   'settings.modelHint': "Default follows the CLI's own setting. Opus is higher quality but slower and uses more quota.",
-  'list.retry': 'Retry'
+  'list.retry': 'Retry',
+  'study.exporting': 'Exporting to PDF…',
+  'study.exportFailed': 'Failed to export PDF'
 }
 
 const dicts: Record<AppLanguage, typeof ko> = { ko, en }

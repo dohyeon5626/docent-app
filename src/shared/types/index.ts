@@ -195,6 +195,20 @@ export interface SummaryProgress {
   total: number
 }
 
+// ---------- Summary export ----------
+
+export interface ExportSummaryPdfRequest {
+  projectId: string
+  title: string
+  html: string
+}
+
+export interface ExportSummaryPdfResult {
+  canceled: boolean
+  filePath?: string
+  error?: string
+}
+
 // ---------- Menu ----------
 
 export interface MenuAction {

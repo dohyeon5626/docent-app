@@ -5,6 +5,8 @@ import { IPC } from '@shared/ipc'
 import type {
   AIStreamDone,
   AnalysisProgress,
+  ExportSummaryPdfRequest,
+  ExportSummaryPdfResult,
   LearningSession,
   Project,
   ProjectSummary,
@@ -14,6 +16,7 @@ import type {
 import type { AIProvider } from '../services/claude/AIProvider'
 import { LearningEngine } from '../services/learning/LearningEngine'
 import { analyzeProject, relocalizePlan } from '../services/pdf/AnalysisService'
+import { renderSummaryPdf } from '../services/pdf/SummaryPdfExporter'
 import * as store from '../services/persistence/store'
 import { buildAppMenu } from '../services/window/menu'
 import {
@@ -269,6 +272,26 @@ export function registerIpcHandlers(ai: AIProvider, windows: WindowManager): voi
     const buf = await fs.readFile(pdfPath)
     return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength)
   })
+
+  ipcMain.handle(
+    IPC.exportSummaryPdf,
+    async (_e, { title, html }: ExportSummaryPdfRequest): Promise<ExportSummaryPdfResult> => {
+      const uiLang = windows.getSettings().language ?? 'ko'
+      const result = await dialog.showSaveDialog({
+        title: uiLang === 'ko' ? 'PDF로 내보내기' : 'Export as PDF',
+        defaultPath: `${title || 'summary'}.pdf`,
+        filters: [{ name: 'PDF', extensions: ['pdf'] }]
+      })
+      if (result.canceled || !result.filePath) return { canceled: true }
+      try {
+        const buffer = await renderSummaryPdf(title, html)
+        await fs.writeFile(result.filePath, buffer)
+        return { canceled: false, filePath: result.filePath }
+      } catch (err) {
+        return { canceled: false, error: err instanceof Error ? err.message : String(err) }
+      }
+    }
+  )
 
   // ---------- Learning ----------
 

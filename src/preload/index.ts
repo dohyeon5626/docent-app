@@ -8,6 +8,8 @@ import type {
   AppSettings,
   CliStatus,
   ConversationEntry,
+  ExportSummaryPdfRequest,
+  ExportSummaryPdfResult,
   LearningPlan,
   LearningSession,
   MenuAction,
@@ -62,6 +64,8 @@ const api = {
   clearConversation: (id: string): Promise<void> =>
     ipcRenderer.invoke(IPC.clearConversation, id),
   readPdf: (pdfPath: string): Promise<ArrayBuffer> => ipcRenderer.invoke(IPC.readPdf, pdfPath),
+  exportSummaryPdf: (req: ExportSummaryPdfRequest): Promise<ExportSummaryPdfResult> =>
+    ipcRenderer.invoke(IPC.exportSummaryPdf, req),
 
   // Learning
   askQuestion: (projectId: string, question: string): Promise<string> =>

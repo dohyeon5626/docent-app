@@ -26,7 +26,7 @@ function useIsDark(): boolean {
 // rendered-diagram cache: source text -> svg (avoids re-render while streaming)
 const mermaidCache = new Map<string, string>()
 let mermaidSeq = 0
-let mermaidTheme = ''
+let mermaidTheme: 'dark' | 'neutral' | '' = ''
 
 /**
  * Swaps ```mermaid code blocks for rendered SVG diagrams (best-effort), and
@@ -41,7 +41,7 @@ async function renderMermaidBlocks(root: HTMLElement, dark: boolean): Promise<vo
       startOnLoad: false,
       securityLevel: 'strict',
       theme,
-      fontFamily: '-apple-system, BlinkMacSystemFont, sans-serif'
+      fontFamily: MERMAID_FONT
     })
   }
 
@@ -78,6 +78,87 @@ async function renderMermaidBlocks(root: HTMLElement, dark: boolean): Promise<vo
   )) {
     const source = holder.dataset.src ?? ''
     if (source && !mermaidCache.has(source)) await renderInto(holder, source)
+  }
+}
+
+/** Resolves any CSS color string (hex/rgb/named) to an [r,g,b] triplet via the browser's own parser. */
+function parseCssColor(value: string): [number, number, number] | null {
+  const probe = document.createElement('span')
+  probe.style.color = value
+  document.body.appendChild(probe)
+  const resolved = getComputedStyle(probe).color
+  document.body.removeChild(probe)
+  const m = resolved.match(/[\d.]+/g)
+  return m && m.length >= 3 ? [Number(m[0]), Number(m[1]), Number(m[2])] : null
+}
+
+const isDarkColor = (rgb: [number, number, number]): boolean =>
+  rgb[0] < 70 && rgb[1] < 70 && rgb[2] < 70
+const isLightColor = (rgb: [number, number, number]): boolean =>
+  rgb[0] > 200 && rgb[1] > 200 && rgb[2] > 200
+
+const MERMAID_FONT = '-apple-system, BlinkMacSystemFont, sans-serif'
+
+/**
+ * Re-renders every mermaid diagram in `root` (a detached clone) using the
+ * light 'neutral' theme, regardless of the app's current dark/light setting.
+ * When the app is in dark mode, mermaid's 'dark' theme fills nodes near-black
+ * by default — fine on screen, but a solid black box wastes a lot of ink and
+ * looks bad when printed to PDF. Diagrams keep their original `data-src` so
+ * this only touches the export clone, never the live document.
+ */
+async function relightMermaidDiagramsForExport(root: HTMLElement): Promise<void> {
+  const holders = Array.from(root.querySelectorAll<HTMLElement>('.mermaid-diagram[data-src]'))
+  if (holders.length === 0) return
+  mermaid.initialize({
+    startOnLoad: false,
+    securityLevel: 'strict',
+    theme: 'neutral',
+    fontFamily: MERMAID_FONT
+  })
+  for (const holder of holders) {
+    const source = holder.dataset.src ?? ''
+    if (!source) continue
+    try {
+      await mermaid.parse(source)
+      const { svg } = await mermaid.render(`mmd-export-${Math.random().toString(36).slice(2)}`, source)
+      holder.innerHTML = svg
+    } catch {
+      // re-parse failed (shouldn't happen for already-rendered sources) — keep as-is
+    }
+  }
+  // restore mermaid's live config so the next on-screen render isn't left on 'neutral'
+  if (mermaidTheme) {
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: 'strict',
+      theme: mermaidTheme,
+      fontFamily: MERMAID_FONT
+    })
+  }
+}
+
+/**
+ * Some AI-drawn diagrams also fill a node solid black directly (an explicit
+ * `style` override), which no theme choice can undo. Flattens any remaining
+ * near-black node fills (and their paired near-white label text) to a light,
+ * print-friendly pair, matching the app's own --bg-soft/--text-dim colors.
+ */
+function flattenDarkMermaidFills(root: HTMLElement): void {
+  for (const el of Array.from(root.querySelectorAll<HTMLElement>('.mermaid-diagram [style]'))) {
+    const fill = el.style.getPropertyValue('fill')
+    if (fill) {
+      const rgb = parseCssColor(fill)
+      if (rgb && isDarkColor(rgb)) {
+        el.style.setProperty('fill', '#f5f5f7')
+        el.style.setProperty('stroke', '#6e6e73')
+      }
+    }
+    const color = el.style.getPropertyValue('color')
+    if (color) {
+      const rgb = parseCssColor(color)
+      if (rgb && isLightColor(rgb)) el.style.setProperty('color', '#1d1d1f')
+    }
   }
 }
 
@@ -259,6 +340,8 @@ export default function AIStudyPanel(): JSX.Element {
   const [input, setInput] = useState('')
   const [stepsOpen, setStepsOpen] = useState(false)
   const [readPos, setReadPos] = useState({ current: 0, max: 0 })
+  const [exporting, setExporting] = useState(false)
+  const [exportError, setExportError] = useState<string | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const qaBodyRef = useRef<HTMLDivElement>(null)
@@ -331,6 +414,28 @@ export default function AIStudyPanel(): JSX.Element {
     clearSearchHighlights()
     setSearchState({ count: 0, active: 0 })
   }, [clearSearchHighlights])
+
+  const exportPdf = useCallback(async (): Promise<void> => {
+    if (!activeProject || !scrollRef.current || exporting) return
+    setExporting(true)
+    setExportError(null)
+    try {
+      const clone = scrollRef.current.cloneNode(true) as HTMLElement
+      clone.querySelectorAll('.gen-banner, .error-card').forEach((el) => el.remove())
+      await relightMermaidDiagramsForExport(clone)
+      flattenDarkMermaidFills(clone)
+      const result = await window.api.exportSummaryPdf({
+        projectId: activeProject.id,
+        title: activeProject.name,
+        html: clone.innerHTML
+      })
+      if (!result.canceled && result.error) setExportError(result.error)
+    } catch (err) {
+      setExportError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setExporting(false)
+    }
+  }, [activeProject, exporting])
 
   // re-run the search when the document content changes (merge, new sections)
   useEffect(() => {
@@ -556,6 +661,11 @@ export default function AIStudyPanel(): JSX.Element {
               disabled: !!streaming,
               onClick: () => void restartLearning()
             },
+            {
+              label: t('menu.exportPdf'),
+              disabled: exporting || sections.length === 0,
+              onClick: () => void exportPdf()
+            },
             ...(paneRole === 'both'
               ? [
                   { type: 'separator' as const },
@@ -614,6 +724,14 @@ export default function AIStudyPanel(): JSX.Element {
           <button className="icon-btn" onClick={closeSearch} title="Close (Esc)">
             ✕
           </button>
+        </div>
+      )}
+
+      {exportError && (
+        <div className="error-card" style={{ margin: '8px 12px 0' }}>
+          <p>
+            {t('study.exportFailed')}: {exportError}
+          </p>
         </div>
       )}
 
