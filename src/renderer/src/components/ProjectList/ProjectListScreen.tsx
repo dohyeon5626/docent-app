@@ -94,7 +94,6 @@ function ProjectRow({ project }: { project: ProjectSummary }): JSX.Element {
 
 function SettingsView(): JSX.Element {
   const cli = useAppStore((s) => s.cli)
-  const recheckCli = useAppStore((s) => s.recheckCli)
   const [theme, setTheme] = useState<ThemePreference>('system')
   const [level, setLevel] = useState<SummaryLevel>('standard')
   const [language, setLanguage] = useState<AppLanguage>('ko')
@@ -155,7 +154,9 @@ function SettingsView(): JSX.Element {
           </div>
         </div>
         <div className="setting-row">
-          <span>{t('settings.language')}</span>
+          <span>
+            {t('settings.language')} <span className="label-suffix">({t('common.default')})</span>
+          </span>
           <div className="seg-control">
             {(
               [
@@ -178,7 +179,9 @@ function SettingsView(): JSX.Element {
       <section>
         <h3>{t('settings.summary')}</h3>
         <div className="setting-row">
-          <span>{t('settings.summaryLevel')}</span>
+          <span>
+            {t('settings.summaryLevel')} <span className="label-suffix">({t('common.default')})</span>
+          </span>
           <div className="seg-control">
             {(
               [
@@ -197,23 +200,19 @@ function SettingsView(): JSX.Element {
             ))}
           </div>
         </div>
-        <div className="setting-row">
-          <span className="hint">{t('settings.summaryDefaultHint')}</span>
-        </div>
       </section>
 
       <section>
         <h3>{t('settings.ai')}</h3>
-        <div className="setting-row">
+        <div className="setting-row row-with-hint">
           <span>{t('settings.aiProvider')}</span>
-          <div className="seg-control">
-            <button className="active">Claude</button>
-            <button disabled title={t('settings.aiProviderHint')}>
-              GPT
-            </button>
-            <button disabled title={t('settings.aiProviderHint')}>
-              Gemini
-            </button>
+          <div className="row-side">
+            <div className="seg-control">
+              <button className="active">Claude</button>
+              <button disabled>GPT</button>
+              <button disabled>Gemini</button>
+            </div>
+            <span className="hint hint-sub">{t('settings.aiProviderHint')}</span>
           </div>
         </div>
         <div className="setting-row">
@@ -237,19 +236,15 @@ function SettingsView(): JSX.Element {
             ))}
           </div>
         </div>
-        <div className="setting-row">
-          <span className="hint">{t('settings.modelHint')}</span>
-        </div>
-        <div className="setting-row">
+        <div className="setting-row row-with-hint">
           <span>Claude Code CLI</span>
-          <span className="value">
-            <span className={`status-dot ${cli?.installed ? 'ok' : 'bad'}`} />
-            {cli?.installed ? (cli.version ?? t('settings.aiInstalled')) : t('settings.aiMissing')}
-          </span>
-        </div>
-        <div className="setting-row">
-          <span className="hint">{t('settings.aiHint')}</span>
-          <button onClick={() => void recheckCli()}>{t('common.check')}</button>
+          <div className="row-side">
+            <span className="value">
+              <span className={`status-dot ${cli?.installed ? 'ok' : 'bad'}`} />
+              {cli?.installed ? (cli.version ?? t('settings.aiInstalled')) : t('settings.aiMissing')}
+            </span>
+            <span className="hint hint-sub">{t('settings.aiHint')}</span>
+          </div>
         </div>
       </section>
 
@@ -258,6 +253,30 @@ function SettingsView(): JSX.Element {
         <div className="setting-row">
           <span>Docent</span>
           <span className="value">Version {APP_VERSION}</span>
+        </div>
+        <div className="setting-row">
+          <span className="about-author">
+            <img
+              className="about-avatar"
+              src="https://github.com/dohyeon5626.png"
+              alt=""
+              onError={(e) => {
+                e.currentTarget.style.display = 'none'
+              }}
+            />
+            {t('settings.github')}
+          </span>
+          <span className="value about-github">
+            <a
+              className="page-link"
+              href="https://github.com/dohyeon5626/docent-app"
+              target="_blank"
+              rel="noreferrer"
+            >
+              github.com/dohyeon5626/docent-app
+            </a>
+            <span className="hint">{t('settings.githubHint')}</span>
+          </span>
         </div>
       </section>
     </div>

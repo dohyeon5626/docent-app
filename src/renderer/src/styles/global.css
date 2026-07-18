@@ -1456,11 +1456,48 @@ code.block {
   margin-bottom: 6px;
   font-size: 13px;
 }
+.setting-row.row-with-hint {
+  align-items: center;
+}
+.row-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+.hint-sub {
+  font-size: 0.85em;
+  opacity: 0.8;
+  text-align: right;
+}
+.setting-row .label-suffix {
+  color: var(--text-dim);
+  font-size: 0.85em;
+}
 .setting-row .value {
   color: var(--text-dim);
   display: inline-flex;
   align-items: center;
   gap: 7px;
+}
+.setting-row .value.about-github {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.setting-row .value.about-github .hint {
+  font-size: 11px;
+}
+.about-author {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.about-avatar {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  object-fit: cover;
 }
 .status-dot {
   width: 8px;
