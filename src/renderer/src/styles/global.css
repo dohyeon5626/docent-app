@@ -223,6 +223,7 @@ textarea:focus {
   flex-direction: column;
   gap: 12px;
   padding: 40px;
+  overflow-y: auto;
 }
 
 /* ================= welcome (loading / setup / create shells) ============ */
@@ -480,6 +481,72 @@ code.block {
   font-size: 12px;
   user-select: all;
   cursor: text;
+}
+
+/* ---------- Setup (CLI missing) screen ---------- */
+
+.setup-card {
+  width: 420px;
+  max-height: 100%;
+  overflow-y: auto;
+  align-items: center;
+  text-align: center;
+  padding: 24px 28px;
+  gap: 14px;
+}
+.setup-card.flash-error {
+  animation: setup-shake 0.4s ease-in-out, setup-flash-border 0.9s ease-out;
+}
+@keyframes setup-shake {
+  20%, 60% { transform: translateX(-5px); }
+  40%, 80% { transform: translateX(5px); }
+}
+@keyframes setup-flash-border {
+  0%, 100% { border-color: var(--hairline-soft); box-shadow: none; }
+  15% { border-color: var(--red); box-shadow: 0 0 0 3px var(--red-bg); }
+}
+.setup-card .hint {
+  margin-top: -6px;
+  line-height: 1.5;
+}
+.setup-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--bg-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.setup-card button {
+  align-self: stretch;
+  padding: 8px 22px;
+  transition: background 0.12s, color 0.12s;
+}
+.setup-card button:hover:not(:disabled) {
+  background: var(--accent);
+  color: #fff;
+}
+.setup-manual {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding-top: 14px;
+  border-top: 1px solid var(--hairline-soft);
+}
+.setup-flash-message {
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 500;
+  animation: setup-message-fade 2.5s ease-out forwards;
+}
+@keyframes setup-message-fade {
+  0% { opacity: 0; }
+  10% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 /* ================= split ================= */

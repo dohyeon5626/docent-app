@@ -68,9 +68,9 @@ const ko = {
 
   // setup
   'setup.title': 'Claude Code CLI 설정이 필요합니다',
-  'setup.body': '이 앱은 Claude Code CLI로 동작합니다. 아래 명령으로 설치하고 로그인해 주세요.',
-  'setup.locked': '설치가 완료될 때까지 메인 기능은 사용할 수 없습니다.',
-  'setup.stillMissing': '아직 Claude CLI를 찾을 수 없습니다. 설치 후 다시 확인해 주세요.',
+  'setup.body': '이 앱은 Claude Code CLI로 동작합니다.\n아래 가이드를 따라 설치하고 로그인해 주세요.',
+  'setup.manualLabel': '공식 설치 가이드:',
+  'setup.stillMissing': '아직 Claude CLI를 찾을 수 없습니다.',
 
   'common.loading': '불러오는 중…',
   'common.cancel': '취소',
@@ -175,9 +175,9 @@ const en: Record<keyof typeof ko, string> = {
   'pane.waitingHint': 'Pick one from File > Recent Projects.',
 
   'setup.title': 'Claude Code CLI required',
-  'setup.body': 'This app runs on the Claude Code CLI. Install and log in with the commands below.',
-  'setup.locked': 'Main features are unavailable until setup completes.',
-  'setup.stillMissing': 'Claude CLI still not found. Install it and check again.',
+  'setup.body': 'This app runs on the Claude Code CLI.\nFollow the guide below to install and log in.',
+  'setup.manualLabel': 'Official install guide:',
+  'setup.stillMissing': 'Claude CLI still not found.',
 
   'common.loading': 'Loading…',
   'common.cancel': 'Cancel',
