@@ -891,6 +891,15 @@ code.block {
   gap: 9px;
   margin-bottom: 12px;
 }
+.doc-caption .section-regen-btn {
+  margin-left: auto;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.doc-section:hover .section-regen-btn,
+.section-regen-btn:has(.spinner) {
+  opacity: 1;
+}
 .doc-caption .title {
   font-size: 16.5px;
   font-weight: 700;

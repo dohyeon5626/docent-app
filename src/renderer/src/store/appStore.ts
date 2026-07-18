@@ -84,6 +84,9 @@ interface AppState {
   /** fold a step's Q&A into its summary section */
   mergeSupplements: (stepId: string) => Promise<void>
   mergingStepId: string | null
+  /** regenerate a single section's summary in place */
+  regenerateSection: (stepId: string) => Promise<void>
+  regeneratingStepId: string | null
   /** current question/answer shown in the fixed panel above the input */
   qaPanel: {
     question: string
@@ -517,6 +520,21 @@ export const useAppStore = create<AppState>((set, get) => {
         set({ aiError: err instanceof Error ? err.message : String(err) })
       } finally {
         set({ mergingStepId: null })
+      }
+    },
+
+    regeneratingStepId: null,
+    regenerateSection: async (stepId) => {
+      const { activeProject, regeneratingStepId, mergingStepId, streaming } = get()
+      if (!activeProject || regeneratingStepId || mergingStepId || streaming) return
+      set({ regeneratingStepId: stepId })
+      try {
+        const conversation = await window.api.regenerateStepSummary(activeProject.id, stepId)
+        set({ conversation })
+      } catch (err) {
+        set({ aiError: err instanceof Error ? err.message : String(err) })
+      } finally {
+        set({ regeneratingStepId: null })
       }
     },
 

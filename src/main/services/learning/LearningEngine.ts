@@ -333,10 +333,11 @@ export class LearningEngine {
   }
 
   /**
-   * Writes the summary document section for one step (used to pre-generate
-   * the whole document after analysis). Doesn't touch the session.
+   * Builds this step's summary via AI. Doesn't persist it — callers decide
+   * whether to append (a section generated for the first time) or replace
+   * (regenerating a section that already has one).
    */
-  async generateStepSummary(
+  private async writeStepSummary(
     projectId: string,
     stepId: string,
     signal?: AbortSignal
@@ -396,7 +397,7 @@ Task: output only this section's summary based on the source above. Do not write
 
     const raw = await this.ai.complete(prompt, { signal })
     const { visible } = splitUpdate(raw)
-    const entry: ConversationEntry = {
+    return {
       id: newId(10),
       role: 'assistant',
       kind: 'study',
@@ -404,8 +405,37 @@ Task: output only this section's summary based on the source above. Do not write
       text: visible,
       createdAt: new Date().toISOString()
     }
+  }
+
+  /**
+   * Writes the summary document section for one step (used to pre-generate
+   * the whole document after analysis). Doesn't touch the session.
+   */
+  async generateStepSummary(
+    projectId: string,
+    stepId: string,
+    signal?: AbortSignal
+  ): Promise<ConversationEntry> {
+    const entry = await this.writeStepSummary(projectId, stepId, signal)
     await store.appendConversation(projectId, entry)
     return entry
+  }
+
+  /**
+   * Regenerates a single section's summary in place — replaces whatever
+   * study entry that step already had, leaving every other step (and any
+   * of this step's un-merged Q&A) untouched. Returns the full conversation.
+   */
+  async regenerateStepSummary(
+    projectId: string,
+    stepId: string,
+    signal?: AbortSignal
+  ): Promise<ConversationEntry[]> {
+    const entry = await this.writeStepSummary(projectId, stepId, signal)
+    return store.updateConversation(projectId, (conversation) => [
+      ...conversation.filter((e) => !(e.stepId === stepId && e.role === 'assistant' && e.kind === 'study')),
+      entry
+    ])
   }
 
   /**
@@ -446,11 +476,11 @@ Task: output the new summary, keeping the current structure but reinforcing the 
 
     const raw = await this.ai.complete(prompt)
     const { visible } = splitUpdate(raw)
-    const updated = ctx.conversation
-      .filter((e) => !(e.stepId === stepId && !(e.role === 'assistant' && e.kind === 'study')))
-      .map((e) => (e.id === study.id ? { ...e, text: visible } : e))
-    await store.saveConversation(projectId, updated)
-    return updated
+    return store.updateConversation(projectId, (conversation) =>
+      conversation
+        .filter((e) => !(e.stepId === stepId && !(e.role === 'assistant' && e.kind === 'study')))
+        .map((e) => (e.id === study.id ? { ...e, text: visible } : e))
+    )
   }
 
   /**

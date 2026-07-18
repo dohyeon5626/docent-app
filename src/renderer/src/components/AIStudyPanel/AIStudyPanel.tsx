@@ -322,6 +322,8 @@ export default function AIStudyPanel(): JSX.Element {
   const revealTarget = useAppStore((s) => s.revealTarget)
   const qaPanel = useAppStore((s) => s.qaPanel)
   const mergingStepId = useAppStore((s) => s.mergingStepId)
+  const regeneratingStepId = useAppStore((s) => s.regeneratingStepId)
+  const regenerateSection = useAppStore((s) => s.regenerateSection)
   const activeProject = useAppStore((s) => s.activeProject)
   const ask = useAppStore((s) => s.ask)
   const retryLast = useAppStore((s) => s.retryLast)
@@ -755,6 +757,22 @@ export default function AIStudyPanel(): JSX.Element {
             <div className="doc-caption">
               <span className="num">{section.index + 1}</span>
               <span className="title">{section.step.title}</span>
+              {section.study && (
+                <button
+                  className="pill-btn section-regen-btn"
+                  disabled={regeneratingStepId !== null || mergingStepId !== null || !!streaming}
+                  onClick={() => void regenerateSection(section.step.id)}
+                >
+                  {regeneratingStepId === section.step.id ? (
+                    <>
+                      <span className="spinner small" />
+                      {t('study.regenerating')}
+                    </>
+                  ) : (
+                    t('study.regenerateSection')
+                  )}
+                </button>
+              )}
             </div>
             {section.study ? (
               <Markdown text={stripLeadingPageRef(section.study.text)} />

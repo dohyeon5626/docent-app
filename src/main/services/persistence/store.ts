@@ -24,26 +24,31 @@ async function readJson<T>(file: string, fallback: T): Promise<T> {
   }
 }
 
-// Atomic writes, serialized per file so concurrent windows can't clobber
-// each other (two renderers often touch projects.json at the same moment).
-const writeQueues = new Map<string, Promise<void>>()
+async function atomicWrite(file: string, value: unknown): Promise<void> {
+  await fs.mkdir(path.dirname(file), { recursive: true })
+  const tmp = `${file}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`
+  await fs.writeFile(tmp, JSON.stringify(value, null, 2), 'utf-8')
+  await fs.rename(tmp, file)
+}
+
+// Serializes operations per file so concurrent callers can't clobber each
+// other — not just the final write, but read-modify-write cycles like
+// appendConversation/updateConversation, which parallel summary generation
+// can trigger several of at once for the same project.
+const fileQueues = new Map<string, Promise<unknown>>()
+
+function enqueue<T>(file: string, task: () => Promise<T>): Promise<T> {
+  const prev = fileQueues.get(file) ?? Promise.resolve()
+  const next = prev.catch(() => {}).then(task)
+  fileQueues.set(file, next)
+  next.finally(() => {
+    if (fileQueues.get(file) === next) fileQueues.delete(file)
+  })
+  return next
+}
 
 async function writeJson(file: string, value: unknown): Promise<void> {
-  const prev = writeQueues.get(file) ?? Promise.resolve()
-  const next = prev
-    .catch(() => {})
-    .then(async () => {
-      await fs.mkdir(path.dirname(file), { recursive: true })
-      const tmp = `${file}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`
-      await fs.writeFile(tmp, JSON.stringify(value, null, 2), 'utf-8')
-      await fs.rename(tmp, file)
-    })
-  writeQueues.set(file, next)
-  try {
-    await next
-  } finally {
-    if (writeQueues.get(file) === next) writeQueues.delete(file)
-  }
+  await enqueue(file, () => atomicWrite(file, value))
 }
 
 // ---------- Projects ----------
@@ -98,10 +103,27 @@ export const getConversation = (id: string): Promise<ConversationEntry[]> =>
 export const saveConversation = (id: string, c: ConversationEntry[]): Promise<void> =>
   writeJson(projectFile(id, 'conversation.json'), c)
 
+/**
+ * Runs `mutate` against the current conversation and persists the result,
+ * all within one queued slot per project so two concurrent callers (e.g.
+ * parallel step-summary generations) can't read the same stale snapshot and
+ * clobber each other's writes.
+ */
+export function updateConversation(
+  id: string,
+  mutate: (conversation: ConversationEntry[]) => ConversationEntry[]
+): Promise<ConversationEntry[]> {
+  const file = projectFile(id, 'conversation.json')
+  return enqueue(file, async () => {
+    const conversation = await readJson<ConversationEntry[]>(file, [])
+    const updated = mutate(conversation)
+    await atomicWrite(file, updated)
+    return updated
+  })
+}
+
 export async function appendConversation(id: string, entry: ConversationEntry): Promise<void> {
-  const conversation = await getConversation(id)
-  conversation.push(entry)
-  await saveConversation(id, conversation)
+  await updateConversation(id, (conversation) => [...conversation, entry])
 }
 
 // ---------- Settings ----------

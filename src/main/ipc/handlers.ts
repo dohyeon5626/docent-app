@@ -41,10 +41,17 @@ export function registerIpcHandlers(ai: AIProvider, windows: WindowManager): voi
   const activeRequests = new Map<string, AbortController>()
   const summaryAborts = new Map<string, AbortController>()
 
+  // How many step summaries to generate at once. Bounded (rather than
+  // unlimited) so each step still sees the previous BATCH's real output for
+  // its "don't repeat the previous section" instruction — only steps within
+  // the same batch lose that continuity signal, not the whole document.
+  const SUMMARY_CONCURRENCY = 3
+
   /**
-   * Pre-writes the summary document: one section per step lacking one.
-   * Cancels any run already in progress for this project first, so a
-   * "rebuild" click always starts clean instead of being a no-op.
+   * Pre-writes the summary document: one section per step lacking one, a
+   * few steps at a time. Cancels any run already in progress for this
+   * project first, so a "rebuild" click always starts clean instead of
+   * being a no-op.
    */
   const ensureSummaries = async (projectId: string): Promise<void> => {
     summaryAborts.get(projectId)?.abort()
@@ -62,16 +69,23 @@ export function registerIpcHandlers(ai: AIProvider, windows: WindowManager): voi
       const missing = plan.steps.filter((s) => !covered.has(s.id))
       if (missing.length === 0) return
       const total = plan.steps.length
-      for (const step of missing) {
+      let done = total - missing.length
+
+      for (let i = 0; i < missing.length; i += SUMMARY_CONCURRENCY) {
         if (controller.signal.aborted) return
-        windows.broadcast(IPC.summaryProgress, {
-          projectId,
-          done: total - missing.length + missing.indexOf(step),
-          total
-        })
-        const entry = await engine.generateStepSummary(projectId, step.id, controller.signal)
+        const batch = missing.slice(i, i + SUMMARY_CONCURRENCY)
+        const results = await Promise.allSettled(
+          batch.map((step) => engine.generateStepSummary(projectId, step.id, controller.signal))
+        )
         if (controller.signal.aborted) return
-        windows.broadcast(IPC.summaryAdded, { projectId, entry })
+        for (const result of results) {
+          if (result.status !== 'fulfilled') continue
+          done++
+          windows.broadcast(IPC.summaryAdded, { projectId, entry: result.value })
+          windows.broadcast(IPC.summaryProgress, { projectId, done, total })
+        }
+        const failed = results.find((r): r is PromiseRejectedResult => r.status === 'rejected')
+        if (failed) throw failed.reason
       }
       windows.broadcast(IPC.summaryProgress, { projectId, done: total, total })
     } catch (err) {
@@ -347,6 +361,15 @@ export function registerIpcHandlers(ai: AIProvider, windows: WindowManager): voi
     IPC.mergeSupplements,
     async (_e, { projectId, stepId }: { projectId: string; stepId: string }) => {
       const conversation = await engine.mergeStepSupplements(projectId, stepId)
+      windows.broadcast(IPC.conversationReplaced, { projectId, conversation })
+      return conversation
+    }
+  )
+
+  ipcMain.handle(
+    IPC.regenerateStepSummary,
+    async (_e, { projectId, stepId }: { projectId: string; stepId: string }) => {
+      const conversation = await engine.regenerateStepSummary(projectId, stepId)
       windows.broadcast(IPC.conversationReplaced, { projectId, conversation })
       return conversation
     }

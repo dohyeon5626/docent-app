@@ -31,6 +31,7 @@ export const IPC = {
   cancelRequest: 'learn:cancel',
   updateSession: 'learn:update-session',
   ensureSummaries: 'learn:ensure-summaries',
+  regenerateStepSummary: 'learn:regenerate-step-summary',
   regeneratePlan: 'learn:regenerate-plan',
   mergeSupplements: 'learn:merge-supplements',
   conversationReplaced: 'learn:conversation-replaced', // main -> renderer event

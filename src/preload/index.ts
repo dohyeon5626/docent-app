@@ -76,6 +76,8 @@ const api = {
     ipcRenderer.invoke(IPC.regeneratePlan, projectId),
   mergeSupplements: (projectId: string, stepId: string): Promise<ConversationEntry[]> =>
     ipcRenderer.invoke(IPC.mergeSupplements, { projectId, stepId }),
+  regenerateStepSummary: (projectId: string, stepId: string): Promise<ConversationEntry[]> =>
+    ipcRenderer.invoke(IPC.regenerateStepSummary, { projectId, stepId }),
   cancelRequest: (requestId: string): Promise<void> =>
     ipcRenderer.invoke(IPC.cancelRequest, requestId),
   updateSession: (
