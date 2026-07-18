@@ -13,7 +13,7 @@ import type {
 } from '@shared/types'
 import type { AIProvider } from '../services/claude/AIProvider'
 import { LearningEngine } from '../services/learning/LearningEngine'
-import { analyzeProject } from '../services/pdf/AnalysisService'
+import { analyzeProject, relocalizePlan } from '../services/pdf/AnalysisService'
 import * as store from '../services/persistence/store'
 import { buildAppMenu } from '../services/window/menu'
 import {
@@ -36,12 +36,17 @@ export function registerIpcHandlers(ai: AIProvider, windows: WindowManager): voi
     }
   )
   const activeRequests = new Map<string, AbortController>()
-  const summaryRuns = new Set<string>()
+  const summaryAborts = new Map<string, AbortController>()
 
-  /** Pre-writes the summary document: one section per step lacking one. */
+  /**
+   * Pre-writes the summary document: one section per step lacking one.
+   * Cancels any run already in progress for this project first, so a
+   * "rebuild" click always starts clean instead of being a no-op.
+   */
   const ensureSummaries = async (projectId: string): Promise<void> => {
-    if (summaryRuns.has(projectId)) return
-    summaryRuns.add(projectId)
+    summaryAborts.get(projectId)?.abort()
+    const controller = new AbortController()
+    summaryAborts.set(projectId, controller)
     try {
       const [plan, conversation] = await Promise.all([
         store.getPlan(projectId),
@@ -55,16 +60,19 @@ export function registerIpcHandlers(ai: AIProvider, windows: WindowManager): voi
       if (missing.length === 0) return
       const total = plan.steps.length
       for (const step of missing) {
+        if (controller.signal.aborted) return
         windows.broadcast(IPC.summaryProgress, {
           projectId,
           done: total - missing.length + missing.indexOf(step),
           total
         })
-        const entry = await engine.generateStepSummary(projectId, step.id)
+        const entry = await engine.generateStepSummary(projectId, step.id, controller.signal)
+        if (controller.signal.aborted) return
         windows.broadcast(IPC.summaryAdded, { projectId, entry })
       }
       windows.broadcast(IPC.summaryProgress, { projectId, done: total, total })
     } catch (err) {
+      if (controller.signal.aborted) return
       windows.broadcast(IPC.summaryProgress, {
         projectId,
         done: -1,
@@ -72,7 +80,7 @@ export function registerIpcHandlers(ai: AIProvider, windows: WindowManager): voi
         error: err instanceof Error ? err.message : String(err)
       })
     } finally {
-      summaryRuns.delete(projectId)
+      if (summaryAborts.get(projectId) === controller) summaryAborts.delete(projectId)
     }
   }
 
@@ -300,6 +308,16 @@ export function registerIpcHandlers(ai: AIProvider, windows: WindowManager): voi
 
   ipcMain.handle(IPC.ensureSummaries, (_e, projectId: string) => {
     void ensureSummaries(projectId)
+  })
+
+  ipcMain.handle(IPC.regeneratePlan, async (_e, projectId: string) => {
+    const project = (await store.listProjects()).find((p) => p.id === projectId)
+    const plan = await store.getPlan(projectId)
+    if (!project || !plan) return null
+    const lang = project.summaryLanguage ?? windows.getSettings().language ?? 'ko'
+    const relocalized = await relocalizePlan(project, plan, ai, lang)
+    await store.savePlan(projectId, relocalized)
+    return relocalized
   })
 
   ipcMain.handle(

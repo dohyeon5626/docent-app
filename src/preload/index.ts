@@ -68,6 +68,8 @@ const api = {
     ipcRenderer.invoke(IPC.askQuestion, { projectId, question }),
   ensureSummaries: (projectId: string): Promise<void> =>
     ipcRenderer.invoke(IPC.ensureSummaries, projectId),
+  regeneratePlan: (projectId: string): Promise<LearningPlan | null> =>
+    ipcRenderer.invoke(IPC.regeneratePlan, projectId),
   mergeSupplements: (projectId: string, stepId: string): Promise<ConversationEntry[]> =>
     ipcRenderer.invoke(IPC.mergeSupplements, { projectId, stepId }),
   cancelRequest: (requestId: string): Promise<void> =>

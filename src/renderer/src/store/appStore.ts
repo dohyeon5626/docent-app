@@ -388,10 +388,26 @@ export const useAppStore = create<AppState>((set, get) => {
     restartLearning: async () => {
       const { activeProject, plan } = get()
       if (!activeProject || !plan?.steps[0]) return
+      // show feedback immediately — the plan relocalization call below can
+      // take a while and summaryProgress otherwise stays null until
+      // ensureSummaries starts, which looks like the UI froze at the start
+      set({ summaryProgress: { done: 0, total: plan.steps.length }, summaryError: null })
       await window.api.clearConversation(activeProject.id)
+      // re-localize the table of contents (plan goal/step titles) into the
+      // current summary language before regenerating the step summaries
+      let effectivePlan = plan
+      try {
+        effectivePlan = (await window.api.regeneratePlan(activeProject.id)) ?? plan
+      } catch (err) {
+        set({
+          summaryProgress: null,
+          summaryError: err instanceof Error ? err.message : String(err)
+        })
+        return
+      }
       const session = await window.api.updateSession(activeProject.id, {
-        currentStepId: plan.steps[0].id,
-        currentPage: plan.steps[0].pages[0] ?? 1,
+        currentStepId: effectivePlan.steps[0].id,
+        currentPage: effectivePlan.steps[0].pages[0] ?? 1,
         completedStepIds: [],
         weakConcepts: [],
         strongConcepts: [],
@@ -399,7 +415,7 @@ export const useAppStore = create<AppState>((set, get) => {
         readMaxRatio: 0
       })
       if (session) set({ session, currentPage: session.currentPage })
-      set({ conversation: [], revealTarget: null })
+      set({ conversation: [], revealTarget: null, plan: effectivePlan })
       // regenerate the whole summary document
       await window.api.ensureSummaries(activeProject.id)
     },

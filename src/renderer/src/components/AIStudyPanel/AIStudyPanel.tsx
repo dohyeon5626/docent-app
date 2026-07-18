@@ -553,7 +553,7 @@ export default function AIStudyPanel(): JSX.Element {
             })),
             {
               label: t('menu.rebuild'),
-              disabled: !!streaming || generating,
+              disabled: !!streaming,
               onClick: () => void restartLearning()
             },
             ...(paneRole === 'both'

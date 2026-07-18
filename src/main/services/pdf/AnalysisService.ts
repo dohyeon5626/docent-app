@@ -104,7 +104,56 @@ Output ONLY JSON matching this schema. All titles/descriptions in ${LANG_NAME[la
 }
 4–10 steps is appropriate.`
 
+const planRelocalizePrompt = (
+  name: string,
+  goal: string,
+  steps: { title: string; description: string }[],
+  lang: AppLanguage
+): string => `
+You are localizing an existing learning plan for the document "${name}" into ${LANG_NAME[lang]}.
+
+Rewrite the goal and each step's title/description in natural ${LANG_NAME[lang]}, preserving their meaning exactly. Do not add, remove, merge, split, or reorder steps — output exactly ${steps.length} step entries, in the same order as given.
+
+Goal: ${goal}
+Steps:
+${steps.map((s, i) => `${i + 1}. ${s.title} — ${s.description}`).join('\n')}
+
+Output ONLY JSON, no prose:
+{"goal": "...", "steps": [{"title": "...", "description": "..."}]}`
+
 export type ProgressCallback = (progress: AnalysisProgress) => void
+
+/**
+ * Re-localizes an already-generated plan's goal/step titles into a new
+ * language, keeping step ids/concepts/pages/status untouched so session
+ * progress and per-step summaries keyed by stepId stay valid.
+ */
+export async function relocalizePlan(
+  project: Project,
+  plan: LearningPlan,
+  ai: AIProvider,
+  lang: AppLanguage
+): Promise<LearningPlan> {
+  const raw = await ai.complete(
+    planRelocalizePrompt(
+      project.name,
+      plan.goal,
+      plan.steps.map((s) => ({ title: s.title, description: s.description })),
+      lang
+    )
+  )
+  const parsed = parseModelJson<{ goal: string; steps: { title: string; description: string }[] }>(
+    raw
+  )
+  return {
+    goal: parsed.goal ?? plan.goal,
+    steps: plan.steps.map((step, i) => ({
+      ...step,
+      title: parsed.steps?.[i]?.title ?? step.title,
+      description: parsed.steps?.[i]?.description ?? step.description
+    }))
+  }
+}
 
 /**
  * Full analysis pipeline for a newly created project:

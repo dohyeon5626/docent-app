@@ -336,7 +336,11 @@ export class LearningEngine {
    * Writes the summary document section for one step (used to pre-generate
    * the whole document after analysis). Doesn't touch the session.
    */
-  async generateStepSummary(projectId: string, stepId: string): Promise<ConversationEntry> {
+  async generateStepSummary(
+    projectId: string,
+    stepId: string,
+    signal?: AbortSignal
+  ): Promise<ConversationEntry> {
     const ctx = await loadContext(projectId)
     const step = ctx.plan.steps.find((s) => s.id === stepId)
     if (!step) throw new Error('Step not found')
@@ -390,7 +394,7 @@ ${pagesText(ctx.pages, step.pages)}
 
 Task: output only this section's summary based on the source above. Do not write the section title (the app renders it). Do not repeat content that belongs to other steps.`
 
-    const raw = await this.ai.complete(prompt)
+    const raw = await this.ai.complete(prompt, { signal })
     const { visible } = splitUpdate(raw)
     const entry: ConversationEntry = {
       id: newId(10),
