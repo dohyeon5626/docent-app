@@ -1,0 +1,30 @@
+appId: com.dohyeon5626.docent
+productName: Docent
+directories:
+  buildResources: build
+  output: dist
+files:
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintrc.cjs,.prettierrc.yaml,CLAUDE.md,README.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
+asarUnpack:
+  - resources/**
+mac:
+  target:
+    - dmg
+    - pkg
+  category: public.app-category.education
+  identity: null
+  hardenedRuntime: false
+  gatekeeperAssess: false
+dmg:
+  sign: false
+pkg:
+  identity: null
+win:
+  target: nsis
+linux:
+  target: AppImage
+  category: Education

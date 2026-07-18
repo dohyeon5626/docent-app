@@ -4,7 +4,7 @@
   "productName": "Docent",
   "description": "AI-powered desktop application for learning PDFs with Claude Code CLI.",
   "main": "./out/main/index.js",
-  "author": "",
+  "author": "dohyeon5626",
   "private": true,
   "scripts": {
     "dev": "electron-vite dev",
