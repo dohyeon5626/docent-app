@@ -14,3 +14,9 @@ Docent is a macOS desktop app that turns your documents (PDF, Word, or Pages) in
 - **Export to PDF**: save the finished summary as a standalone PDF, styled to match the in-app reading view.
 
 > Powered by the local [Claude Code CLI](https://code.claude.com/docs/en/setup) — no Anthropic API key required.
+
+## Installing on macOS
+
+The app isn't notarized with a paid Apple Developer certificate yet, so macOS will refuse to open it the first time. To run it:
+1. Right-click (or Control-click) `Docent.app` and choose **Open**, then click **Open** in the dialog that appears.
+2. If that doesn't work: open **System Settings → Privacy & Security**, scroll down to the message that `Docent.app` was blocked, and click **Open Anyway**.
