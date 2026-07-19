@@ -158,7 +158,7 @@ const FORMAT_RULES_BASE = `- Your output is a **summary**. Do not transcribe the
 - Short sentences. One bullet = one fact. Never say the same thing twice.
 - Put blank lines between blocks (subheadings, tables, lists) so the text can breathe.
 - Open with "[page N]" stating where this content starts; the app scrolls the left PDF there.
-- End every bullet/paragraph with "[p:N]" citing the source page; clicking it spotlights that spot. Omit it only for general knowledge not in the document.
+- End every bullet/paragraph with a citation in the exact form [p:N:"exact quote"] — N is the source page, and "exact quote" is a short (3–8 word) snippet copied character-for-character from that page's source text, in the source document's own language (even if your summary is written in a different language). This is REQUIRED on every citation, with no exceptions — never write a bare [p:N] with no quote, even when your output language matches the source's. The quote is what lets the app find and highlight the precise spot on the source page. Omit the whole citation only for general knowledge not in the document.
 - Combine varied markdown so it scans at a glance (use at least 2 of these every time):
   - Tables: always use one for comparisons, term glossaries, pros/cons.
   - "### subheadings" when there are two or more topic blocks.
@@ -520,7 +520,7 @@ ${recentConversation(ctx.conversation)}
 
 The learner asks: "${question}"
 
-Task: write a supplementary explanation that answers the question. It will be shown alongside the "${step?.title ?? 'current'}" step summary. Cite evidence from the document with [page N] and per-sentence [p:N]; if the answer isn't in the document, answer from general knowledge and say so.
+Task: write a supplementary explanation that answers the question. It will be shown alongside the "${step?.title ?? 'current'}" step summary. Cite evidence from the document with [page N] to open the section, and every per-sentence citation MUST be [p:N:"exact quote"] — a short (3–8 word) verbatim snippet copied character-for-character from that page's source text, in the source document's own language, even if you're answering in a different language. Never write a bare [p:N] with no quote. If the answer isn't in the document, answer from general knowledge and say so.
 - The very last line MUST be exactly this format (it is hidden from the learner):
 ${UPDATE_MARKER}{"understanding":"weak|ok|strong","weakConcepts":[],"strongConcepts":[]}`
 

@@ -20,6 +20,8 @@ interface HighlightRect {
 
 const normalize = (s: string): string => s.replace(/\s+/g, '').toLowerCase()
 
+type PdfTextItem = import('pdfjs-dist/types/src/display/api').TextItem
+
 function bigrams(s: string): Set<string> {
   const set = new Set<string>()
   for (let i = 0; i < s.length - 1; i++) set.add(s.slice(i, i + 2))
@@ -34,47 +36,26 @@ function diceSimilarity(a: Set<string>, b: Set<string>): number {
 }
 
 /**
- * Locates where a summary sentence came from: finds the contiguous run of
- * text items whose combined text is most similar (bigram Dice) to the query,
- * so only the actual source region lights up — not every word occurrence.
+ * Acronyms, numbers, and API/product names (TCP, HTTP/2, GC, 3-way, ...) tend
+ * to survive translation untouched even when the rest of a summary sentence
+ * is written in a different language than the source document. When the
+ * summary language differs from the document's, these are often the only
+ * substrings that can still be found on the page.
  */
-async function findHighlightRects(
-  page: Awaited<ReturnType<PDFDocumentProxy['getPage']>>,
+function extractLatinTokens(s: string): string[] {
+  const matches = s.match(/[A-Za-z0-9][A-Za-z0-9./+-]{2,}/g) ?? []
+  return [...new Set(matches.map((t) => t.toLowerCase()))]
+}
+
+/** Merges per-item rects into one rect per visual line (adjacent items on the same baseline). */
+function buildLineRects(
+  viewport: ReturnType<PDFDocumentProxy['getPage']> extends never ? never : { transform: number[] },
   scale: number,
-  query: string
-): Promise<HighlightRect[]> {
-  const q = normalize(
-    query.replace(/\d+쪽\s*→?/g, ' ').replace(/[*_`>#|[\]()→·]/g, ' ')
-  )
-  if (q.length < 6) return []
-  const qGrams = bigrams(q)
-
-  const viewport = page.getViewport({ scale })
-  const content = await page.getTextContent()
-  const items = content.items.filter(
-    (it): it is import('pdfjs-dist/types/src/display/api').TextItem =>
-      'str' in it && !!it.str.trim()
-  )
-  if (items.length === 0) return []
-  const texts = items.map((it) => normalize(it.str))
-
-  // best contiguous window of items vs. the query sentence
-  let best = { score: 0, from: 0, to: 0 }
-  const maxLen = Math.max(q.length * 1.6, q.length + 24)
-  for (let i = 0; i < items.length; i++) {
-    let acc = ''
-    for (let j = i; j < items.length && j - i < 40; j++) {
-      acc += texts[j]
-      if (acc.length > maxLen) break
-      const score = diceSimilarity(bigrams(acc), qGrams)
-      if (score > best.score) best = { score, from: i, to: j }
-    }
-  }
-  if (best.score < 0.32) return []
-
-  // one rect per text line within the winning run
+  items: PdfTextItem[],
+  indices: number[]
+): HighlightRect[] {
   const lines: HighlightRect[] = []
-  for (let k = best.from; k <= best.to; k++) {
+  for (const k of indices) {
     const item = items[k]
     const tx = pdfjs.Util.transform(viewport.transform, item.transform)
     const fontH = Math.hypot(tx[2], tx[3]) || 10
@@ -95,6 +76,64 @@ async function findHighlightRects(
     }
   }
   return lines.slice(0, 8)
+}
+
+/**
+ * Locates where a summary sentence came from: finds the contiguous run of
+ * text items whose combined text is most similar (bigram Dice) to the query,
+ * so only the actual source region lights up — not every word occurrence.
+ *
+ * When the summary is written in a different language than the source
+ * document, bigram similarity is essentially always ~0 (no character overlap
+ * between e.g. Korean and English), so this falls back to matching whatever
+ * acronyms/numbers/terms the query and the page text still share verbatim.
+ */
+async function findHighlightRects(
+  page: Awaited<ReturnType<PDFDocumentProxy['getPage']>>,
+  scale: number,
+  query: string
+): Promise<HighlightRect[]> {
+  const q = normalize(
+    query.replace(/\d+쪽\s*→?/g, ' ').replace(/[*_`>#|[\]()→·]/g, ' ')
+  )
+  if (q.length < 6) return []
+
+  const viewport = page.getViewport({ scale })
+  const content = await page.getTextContent()
+  const items = content.items.filter(
+    (it): it is PdfTextItem => 'str' in it && !!it.str.trim()
+  )
+  if (items.length === 0) return []
+  const texts = items.map((it) => normalize(it.str))
+
+  // best contiguous window of items vs. the query sentence
+  const qGrams = bigrams(q)
+  let best = { score: 0, from: 0, to: 0 }
+  const maxLen = Math.max(q.length * 1.6, q.length + 24)
+  for (let i = 0; i < items.length; i++) {
+    let acc = ''
+    for (let j = i; j < items.length && j - i < 40; j++) {
+      acc += texts[j]
+      if (acc.length > maxLen) break
+      const score = diceSimilarity(bigrams(acc), qGrams)
+      if (score > best.score) best = { score, from: i, to: j }
+    }
+  }
+  if (best.score >= 0.32) {
+    const indices = Array.from({ length: best.to - best.from + 1 }, (_, i) => best.from + i)
+    return buildLineRects(viewport, scale, items, indices)
+  }
+
+  // Cross-language fallback: same-script similarity found nothing — try
+  // matching shared acronyms/numbers/terms instead of the whole sentence.
+  const tokens = extractLatinTokens(query)
+  if (tokens.length === 0) return []
+  const matched = items
+    .map((it, idx) => ({ idx, str: it.str.toLowerCase() }))
+    .filter(({ str }) => tokens.some((t) => str.includes(t)))
+    .map(({ idx }) => idx)
+  if (matched.length === 0) return []
+  return buildLineRects(viewport, scale, items, matched)
 }
 
 /** Union bounding box (for the dimming spotlight ring). */

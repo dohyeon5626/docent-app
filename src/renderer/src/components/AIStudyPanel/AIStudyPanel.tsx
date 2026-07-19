@@ -176,14 +176,22 @@ function annotatePageAnchors(html: string): string {
   const touched: Text[] = []
   while (walker.nextNode()) {
     const node = walker.currentNode as Text
-    if (/\[p:\d+\]/i.test(node.data)) touched.push(node)
+    if (/\[p:\d+/i.test(node.data)) touched.push(node)
   }
   for (const node of touched) {
     let page: number | null = null
-    node.data = node.data.replace(/\s*\[p:(\d+)\]/gi, (_m, n: string) => {
-      page = Number(n)
-      return ''
-    })
+    let quote: string | null = null
+    // [p:N] or [p:N:"verbatim source-language quote"] (added when the
+    // summary's language differs from the source document's, so the exact
+    // spot can still be found and highlighted after translation)
+    node.data = node.data.replace(
+      /\s*\[p:(\d+)(?::"([^"]*)")?\]/gi,
+      (_m, n: string, q?: string) => {
+        page = Number(n)
+        if (q) quote = q
+        return ''
+      }
+    )
     if (page === null) continue
     let el: HTMLElement | null = node.parentElement
     while (el && !BLOCK_TAGS.has(el.tagName)) el = el.parentElement
@@ -191,19 +199,23 @@ function annotatePageAnchors(html: string): string {
     if (target && !target.dataset.page) {
       target.dataset.page = String(page)
       target.classList.add('anchored')
+      if (quote) target.dataset.quote = quote
     }
   }
   const blocks = Array.from(
     doc.body.querySelectorAll<HTMLElement>('p, li, h1, h2, h3, h4, table, pre, blockquote')
   )
   let lastPage: string | null = null
+  let lastQuote: string | null = null
   const pending: HTMLElement[] = []
   for (const block of blocks) {
     if (block.dataset.page) {
       lastPage = block.dataset.page
+      lastQuote = block.dataset.quote ?? null
       for (const p of pending.splice(0)) {
         p.dataset.page = lastPage
         p.classList.add('anchored')
+        if (lastQuote) p.dataset.quote = lastQuote
       }
       continue
     }
@@ -212,6 +224,7 @@ function annotatePageAnchors(html: string): string {
     if (lastPage) {
       block.dataset.page = lastPage
       block.classList.add('anchored')
+      if (lastQuote) block.dataset.quote = lastQuote
     } else {
       pending.push(block)
     }
@@ -267,9 +280,12 @@ function Markdown({ text }: { text: string }): JSX.Element {
         const target = (e.target as HTMLElement).closest('[data-page]')
         const page = target?.getAttribute('data-page')
         if (!page) return
-        const query = target?.classList.contains('anchored')
-          ? (target.textContent ?? '').trim()
-          : undefined
+        // a verbatim source-language quote (cross-language citation) beats
+        // searching for the block's own, possibly-translated, text
+        const quote = target?.getAttribute('data-quote')
+        const query =
+          quote ||
+          (target?.classList.contains('anchored') ? (target.textContent ?? '').trim() : undefined)
         setPage(Number(page), query ? { highlight: query } : undefined)
       }}
       dangerouslySetInnerHTML={{ __html: html }}
