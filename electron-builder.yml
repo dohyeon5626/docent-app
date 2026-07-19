@@ -16,6 +16,7 @@ files:
   - '!{.env,.env.*,.npmrc,pnpm-lock.yaml}'
 asarUnpack:
   - resources/**
+afterSign: build/afterSign.js
 mac:
   target:
     - dmg
