@@ -3,6 +3,7 @@ import { promises as fs } from 'fs'
 import path from 'path'
 import type {
   Analysis,
+  AppLanguage,
   AppSettings,
   ConversationEntry,
   LearningPlan,
@@ -128,12 +129,17 @@ export async function appendConversation(id: string, entry: ConversationEntry): 
 
 // ---------- Settings ----------
 
-const defaultSettings: AppSettings = {
+/** First-install default: match the OS language, falling back to English. */
+const detectDefaultLanguage = (): AppLanguage =>
+  app.getLocale().toLowerCase().startsWith('ko') ? 'ko' : 'en'
+
+const defaultSettings = (): AppSettings => ({
   windowMode: 'split',
   splitRatio: 0.5,
-  windows: {}
-}
+  windows: {},
+  language: detectDefaultLanguage()
+})
 
 export const getSettings = (): Promise<AppSettings> =>
-  readJson<AppSettings>(settingsFile(), defaultSettings)
+  readJson<AppSettings>(settingsFile(), defaultSettings())
 export const saveSettings = (s: AppSettings): Promise<void> => writeJson(settingsFile(), s)
