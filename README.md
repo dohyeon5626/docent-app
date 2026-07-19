@@ -1,6 +1,6 @@
 # Docent<img src="https://github.com/user-attachments/assets/a32cc0f0-de76-4fba-bd9c-0605bef016a1" align=left width=100>
 
-![GitHub License](https://img.shields.io/github/license/dohyeon5626/docent-app?style=flat&color=green) ![GitHub Release](https://img.shields.io/github/v/release/dohyeon5626/docent-app?style=flat&color=blue) ![Platform](https://img.shields.io/badge/platform-macOS-blue?style=flat)
+![GitHub License](https://img.shields.io/github/license/dohyeon5626/docent-app?style=flat&color=green) ![GitHub Tag](https://img.shields.io/github/v/tag/dohyeon5626/docent-app?style=flat&color=green`) ![Platform](https://img.shields.io/badge/platform-macOS-blue?style=flat)
 <br/><br/>
 
 <img width="100%" align=center alt="preview" src="https://github.com/user-attachments/assets/aa18ed35-0b9a-458d-bd96-cd2c9649e143">
