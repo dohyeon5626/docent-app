@@ -1,0 +1,625 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Docent — Learn with Claude, not just chat with Claude</title>
+    <meta
+      name="description"
+      content="Docent is a macOS app that turns your documents (PDF, Word, or Pages) into an AI-written study guide, with every sentence linked back to the source page."
+    />
+    <link rel="canonical" href="https://dohyeon5626.github.io/docent-app/" />
+    <meta name="robots" content="index, follow" />
+    <meta name="author" content="dohyeon5626" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Docent" />
+    <meta property="og:title" content="Docent — Learn with Claude, not just chat with Claude" />
+    <meta
+      property="og:description"
+      content="A macOS app that turns your documents (PDF, Word, or Pages) into an AI-written study guide, with every sentence linked back to the source page."
+    />
+    <meta property="og:url" content="https://dohyeon5626.github.io/docent-app/" />
+    <meta property="og:image" content="https://dohyeon5626.github.io/docent-app/preview.jpg" />
+    <meta property="og:image:width" content="2420" />
+    <meta property="og:image:height" content="450" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Docent — Learn with Claude, not just chat with Claude" />
+    <meta
+      name="twitter:description"
+      content="A macOS app that turns your documents (PDF, Word, or Pages) into an AI-written study guide, with every sentence linked back to the source page."
+    />
+    <meta name="twitter:image" content="https://dohyeon5626.github.io/docent-app/preview.jpg" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Docent",
+        "operatingSystem": "macOS",
+        "applicationCategory": "EducationalApplication",
+        "description": "Docent turns your documents (PDF, Word, or Pages) into an AI-written study guide, with every sentence linked back to the source page.",
+        "url": "https://dohyeon5626.github.io/docent-app/",
+        "downloadUrl": "https://github.com/dohyeon5626/docent-app/releases",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "author": { "@type": "Person", "name": "dohyeon5626", "url": "https://github.com/dohyeon5626" }
+      }
+    </script>
+    <link
+      rel="icon"
+      type="image/svg+xml"
+      href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none"><rect width="64" height="64" rx="14.5" fill="%232a2e35"/><rect x="15" y="19" width="34" height="5.5" rx="2.75" fill="rgba(255,255,255,0.92)"/><rect x="15" y="29.25" width="34" height="5.5" rx="2.75" fill="%23f7c948"/><rect x="15" y="39.5" width="22" height="5.5" rx="2.75" fill="rgba(255,255,255,0.55)"/></svg>'
+    />
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      :root {
+        color-scheme: light dark;
+        --bg: #ffffff;
+        --bg-soft: #f5f5f7;
+        --hairline: rgba(0, 0, 0, 0.1);
+        --hairline-soft: rgba(0, 0, 0, 0.06);
+        --text: #1d1d1f;
+        --text-dim: #6e6e73;
+        --text-faint: #aeaeb2;
+        --accent: #3574d4;
+        --accent-hover: #2c65bb;
+        --card: #ffffff;
+        --shadow-pop: 0 3px 14px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(0, 0, 0, 0.07);
+        --code-bg: rgba(0, 0, 0, 0.045);
+        --hl: rgba(247, 201, 72, 0.55);
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #1e1e20;
+          --bg-soft: #29292c;
+          --hairline: rgba(255, 255, 255, 0.12);
+          --hairline-soft: rgba(255, 255, 255, 0.07);
+          --text: #f5f5f7;
+          --text-dim: #98989d;
+          --text-faint: #636366;
+          --accent: #6ca4e8;
+          --accent-hover: #83b3ec;
+          --card: #2a2a2d;
+          --shadow-pop: 0 3px 14px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.09);
+          --code-bg: rgba(255, 255, 255, 0.07);
+          --hl: rgba(247, 201, 72, 0.32);
+        }
+      }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, 'Helvetica Neue',
+          Arial, sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.6;
+        -webkit-font-smoothing: antialiased;
+      }
+      .wrap {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 0 28px;
+      }
+      mark {
+        background: linear-gradient(transparent 18%, var(--hl) 18%, var(--hl) 92%, transparent 92%);
+        color: inherit;
+        padding: 0 2px;
+        border-radius: 2px;
+      }
+      a {
+        color: var(--accent);
+      }
+
+      /* nav */
+      nav {
+        border-bottom: 1px solid var(--hairline-soft);
+      }
+      nav .wrap {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        height: 58px;
+      }
+      nav .brand {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-weight: 700;
+        font-size: 16px;
+        color: var(--text);
+        text-decoration: none;
+      }
+      nav .spacer {
+        flex: 1;
+      }
+      nav .gh {
+        font-size: 14px;
+        color: var(--text-dim);
+        text-decoration: none;
+      }
+      nav .gh:hover {
+        color: var(--accent);
+      }
+
+      /* hero */
+      .hero {
+        position: relative;
+        padding: 88px 0 72px;
+      }
+      .hero > .wrap {
+        position: relative;
+        z-index: 1;
+      }
+      .eyebrow {
+        font-size: 13px;
+        font-weight: 600;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--text-faint);
+      }
+      .hero h1 {
+        margin-top: 12px;
+        font-size: clamp(34px, 5.4vw, 54px);
+        line-height: 1.14;
+        font-weight: 800;
+        letter-spacing: -0.022em;
+        max-width: 15em;
+      }
+      .hero .lead {
+        margin-top: 18px;
+        font-size: 17px;
+        color: var(--text-dim);
+      }
+
+      /* download */
+      .download {
+        margin-top: 30px;
+        min-height: 74px;
+      }
+      .dl-buttons {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+      }
+      .dl-btn {
+        display: inline-block;
+        min-width: 168px;
+        padding: 12px 26px;
+        border-radius: 999px;
+        text-decoration: none;
+        text-align: center;
+        font-size: 15px;
+        font-weight: 600;
+        border: 1.5px solid var(--text);
+        background: transparent;
+        color: var(--text);
+        transition:
+          background 0.15s,
+          border-color 0.15s,
+          opacity 0.15s;
+      }
+      .dl-btn:hover {
+        opacity: 0.75;
+      }
+      .dl-btn.primary {
+        background: #2a2e35;
+        border-color: #2a2e35;
+        color: #fff;
+      }
+      .dl-btn.primary:hover {
+        background: #3a3f48;
+        border-color: #3a3f48;
+        opacity: 1;
+      }
+      @media (prefers-color-scheme: dark) {
+        .dl-btn.primary {
+          background: #f5f5f7;
+          border-color: #f5f5f7;
+          color: #1d1d1f;
+        }
+        .dl-btn.primary:hover {
+          background: #e2e2e5;
+          border-color: #e2e2e5;
+        }
+      }
+      .dl-meta {
+        margin-top: 10px;
+        font-size: 13px;
+        color: var(--text-faint);
+      }
+      .dl-meta a {
+        color: var(--text-dim);
+      }
+      .dl-status {
+        font-size: 14px;
+        color: var(--text-dim);
+      }
+      .dl-caveat {
+        margin-top: 12px;
+        font-size: 12.5px;
+        color: var(--text-faint);
+      }
+      .dl-caveat a {
+        color: var(--text-dim);
+      }
+
+      /* screenshots drifting slowly right-to-left BEHIND the hero, as a backdrop */
+      .hero-bg {
+        position: absolute;
+        inset: 0;
+        z-index: 0;
+        display: flex;
+        align-items: center;
+        overflow: hidden;
+        pointer-events: none;
+        opacity: 0.14;
+        /* melt into the page at the top and bottom so it reads as texture */
+        -webkit-mask-image: linear-gradient(to bottom, transparent, #000 30%, #000 70%, transparent);
+        mask-image: linear-gradient(to bottom, transparent, #000 30%, #000 70%, transparent);
+      }
+      .carousel-track {
+        display: flex;
+        width: max-content;
+        animation: drift 90s linear infinite;
+        will-change: transform;
+      }
+      .carousel-track img {
+        height: min(340px, 40vw);
+        width: auto;
+        display: block;
+        margin-right: 28px;
+        border-radius: 12px;
+        filter: saturate(0.7);
+      }
+      @keyframes drift {
+        to {
+          transform: translateX(-50%);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .carousel-track {
+          animation: none;
+        }
+      }
+
+      /* sections */
+      section {
+        padding: 64px 0 0;
+      }
+      section > .wrap > h2 {
+        font-size: 26px;
+        font-weight: 700;
+        letter-spacing: -0.01em;
+        margin-bottom: 8px;
+      }
+      .section-sub {
+        color: var(--text-dim);
+        font-size: 15px;
+      }
+
+      /* how it works: numbered like the app's learning steps */
+      .steps {
+        margin-top: 30px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 34px 28px;
+        list-style: none;
+        counter-reset: step;
+      }
+      .steps li {
+        counter-increment: step;
+        font-size: 14px;
+        color: var(--text-dim);
+      }
+      .steps li::before {
+        content: 'Step ' counter(step);
+        display: inline-block;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        background: linear-gradient(transparent 15%, var(--hl) 15%, var(--hl) 95%, transparent 95%);
+        padding: 0 3px;
+        margin-bottom: 8px;
+      }
+      .steps li strong {
+        display: block;
+        font-size: 16px;
+        color: var(--text);
+        margin-bottom: 6px;
+        letter-spacing: -0.01em;
+      }
+
+      /* features: same typographic voice as the steps */
+      .features {
+        margin-top: 30px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 30px 40px;
+        list-style: none;
+      }
+      .features li {
+        font-size: 14px;
+        color: var(--text-dim);
+      }
+      .features li strong {
+        display: block;
+        font-size: 16px;
+        color: var(--text);
+        margin-bottom: 6px;
+        letter-spacing: -0.01em;
+      }
+
+      /* install steps: plain numbered list, no box */
+      .install-steps {
+        margin-top: 26px;
+        list-style: none;
+        counter-reset: inst;
+      }
+      .install-steps li {
+        counter-increment: inst;
+        position: relative;
+        padding: 0 0 18px 44px;
+        font-size: 15px;
+        color: var(--text-dim);
+      }
+      .install-steps li:last-child {
+        padding-bottom: 0;
+      }
+      .install-steps li::before {
+        content: counter(inst);
+        position: absolute;
+        left: 0;
+        top: 1px;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        border: 1px solid var(--hairline);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+        background: var(--bg-soft);
+      }
+      .install-steps kbd,
+      .install-steps code {
+        background: var(--code-bg);
+        border-radius: 5px;
+        padding: 1px 6px;
+        font-size: 13px;
+        font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+        color: var(--text);
+      }
+
+      footer {
+        margin-top: 76px;
+        border-top: 1px solid var(--hairline-soft);
+        padding: 26px 0 46px;
+        font-size: 13px;
+        color: var(--text-faint);
+      }
+      footer .wrap {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 18px;
+        align-items: baseline;
+      }
+      footer a {
+        color: var(--text-dim);
+        text-decoration: none;
+      }
+      footer a:hover {
+        color: var(--accent);
+      }
+      footer .spacer {
+        flex: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <div class="wrap">
+        <a class="brand" href="#">
+          <svg width="26" height="26" viewBox="0 0 64 64" fill="none" aria-hidden="true">
+            <rect width="64" height="64" rx="14.5" fill="#2a2e35" />
+            <rect x="15" y="19" width="34" height="5.5" rx="2.75" fill="rgba(255,255,255,0.92)" />
+            <rect x="15" y="29.25" width="34" height="5.5" rx="2.75" fill="#f7c948" />
+            <rect x="15" y="39.5" width="22" height="5.5" rx="2.75" fill="rgba(255,255,255,0.55)" />
+          </svg>
+          Docent
+        </a>
+        <div class="spacer"></div>
+        <a class="gh" href="https://github.com/dohyeon5626/docent-app">GitHub&nbsp;→</a>
+      </div>
+    </nav>
+
+    <header class="hero">
+      <!-- drifting app screenshots as a muted backdrop; set duplicated so the
+           -50% translate loops seamlessly -->
+      <div class="hero-bg" aria-hidden="true">
+        <div class="carousel-track">
+          <img src="shot-1.jpg" width="1600" height="900" alt="" />
+          <img src="shot-2.jpg" width="1600" height="900" alt="" />
+          <img src="shot-3.jpg" width="1600" height="900" alt="" />
+          <img src="shot-1.jpg" width="1600" height="900" alt="" />
+          <img src="shot-2.jpg" width="1600" height="900" alt="" />
+          <img src="shot-3.jpg" width="1600" height="900" alt="" />
+        </div>
+      </div>
+      <div class="wrap">
+        <p class="eyebrow">macOS · Powered by the local Claude Code CLI</p>
+        <h1>Turn any document<br />into a <mark>study guide</mark>.</h1>
+        <p class="lead">
+          Docent turns your documents (PDF, Word, or Pages) into a study guide. Read the
+          summary to get through the material fast — and whenever something isn't clear, click
+          the sentence to see the exact spot in the original it came from.
+        </p>
+
+        <div class="download" id="download">
+          <p class="dl-status">Loading the latest release…</p>
+        </div>
+        <p class="dl-caveat">
+          Not notarized yet — if macOS blocks the first launch, right-click →
+          <em>Open</em>, or use <em>Privacy &amp; Security → Open Anyway</em>.
+          <a href="#install">Details</a>
+        </p>
+      </div>
+    </header>
+
+    <section>
+      <div class="wrap">
+        <h2>How you study with it</h2>
+        <p class="section-sub">
+          No prompting, no chat transcript to scroll back through. The whole guide is written
+          before you start reading — you just read.
+        </p>
+        <ol class="steps">
+          <li>
+            <strong>Open a document</strong>
+            Claude reads it and writes a complete study guide, organized into steps ordered by
+            what's easiest to learn first — not by page order.
+          </li>
+          <li>
+            <strong>Skim fast, check instantly</strong>
+            Get through the material by reading the summary. When a line needs a closer look,
+            click it — the original opens at the exact passage, spotlighted.
+          </li>
+          <li>
+            <strong>Ask &amp; merge</strong>
+            Still unclear? Ask a question, then hit "Merge into Summary" to fold the answer
+            into that section — your guide keeps getting better as you study.
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section>
+      <div class="wrap">
+        <h2>Features</h2>
+        <ul class="features">
+          <li>
+            <strong>A guide, not a wall of text</strong>
+            One scrollable summary of the whole document, written with highlights, tables, and
+            diagrams where they actually help.
+          </li>
+          <li>
+            <strong>Two-way page sync</strong>
+            Click a sentence in the summary to spotlight its source in the original; click a
+            page in the original to find where the summary covers it.
+          </li>
+          <li>
+            <strong>Your language, your depth</strong>
+            Brief, standard, or detailed — in Korean or English, per project. Regenerate the
+            whole guide, or just the one section that didn't come out right.
+          </li>
+          <li>
+            <strong>PDF, Word, and Pages</strong>
+            Drop in any of the three — Docent extracts the text and pages itself.
+          </li>
+          <li>
+            <strong>Take the guide with you</strong>
+            Export the finished summary as a standalone PDF, styled like the in-app reading
+            view.
+          </li>
+          <li>
+            <strong>No API key, no sign-up</strong>
+            Runs on the Claude Code CLI already installed on your Mac — your documents stay
+            local.
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="install">
+      <div class="wrap">
+        <h2>Installing on macOS</h2>
+        <p class="section-sub">
+          The app isn't notarized with a paid Apple Developer certificate yet, so macOS will
+          refuse to open it the first time. To run it:
+        </p>
+        <ol class="install-steps">
+          <li>
+            Right-click (or Control-click) <code>Docent.app</code> and choose <kbd>Open</kbd>,
+            then click <kbd>Open</kbd> in the dialog that appears.
+          </li>
+          <li>
+            If that doesn't work: open <kbd>System Settings → Privacy &amp; Security</kbd>,
+            scroll down to the message that <code>Docent.app</code> was blocked, and click
+            <kbd>Open Anyway</kbd>.
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <footer>
+      <div class="wrap">
+        <span>Docent</span>
+        <a href="https://github.com/dohyeon5626/docent-app">GitHub</a>
+        <a href="https://github.com/dohyeon5626/docent-app/releases">All releases</a>
+        <a href="https://github.com/dohyeon5626/docent-app/blob/main/LICENSE">License</a>
+        <span class="spacer"></span>
+        <span>
+          Powered by the local
+          <a href="https://code.claude.com/docs/en/setup">Claude Code CLI</a> — no Anthropic
+          API key required.
+        </span>
+      </div>
+    </footer>
+
+    <script>
+      const REPO = 'dohyeon5626/docent-app'
+      const RELEASES_PAGE = `https://github.com/${REPO}/releases`
+
+      const box = document.getElementById('download')
+
+      function fallback() {
+        box.innerHTML = `
+          <div class="dl-buttons">
+            <a class="dl-btn primary" href="${RELEASES_PAGE}">See all releases</a>
+          </div>
+          <p class="dl-meta">Apple Silicon</p>`
+      }
+
+      function mb(bytes) {
+        return `${(bytes / (1024 * 1024)).toFixed(0)} MB`
+      }
+
+      function render(release) {
+        const assets = release.assets ?? []
+        const dmg = assets.find((a) => a.name.endsWith('.dmg'))
+        const pkg = assets.find((a) => a.name.endsWith('.pkg'))
+        if (!dmg && !pkg) return fallback()
+
+        box.innerHTML = `
+          <div class="dl-buttons">
+            ${dmg ? `<a class="dl-btn primary" href="${dmg.browser_download_url}">Download .dmg</a>` : ''}
+            ${pkg ? `<a class="dl-btn" href="${pkg.browser_download_url}">Download .pkg</a>` : ''}
+          </div>
+          <p class="dl-meta">
+            ${release.tag_name}${release.prerelease ? ' (pre-release)' : ''} ·
+            ${mb((dmg ?? pkg).size)} · Apple Silicon ·
+            <a href="${release.html_url}">release notes</a>
+          </p>`
+      }
+
+      // The /releases/latest endpoint skips pre-releases, so list releases and
+      // take the newest one that actually ships downloadable files.
+      fetch(`https://api.github.com/repos/${REPO}/releases?per_page=10`)
+        .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+        .then((releases) => {
+          const withAssets = releases.find((r) => !r.draft && (r.assets ?? []).length > 0)
+          const newest = withAssets ?? releases.find((r) => !r.draft)
+          if (!newest) return fallback()
+          render(newest)
+        })
+        .catch(fallback)
+    </script>
+  </body>
+</html>
