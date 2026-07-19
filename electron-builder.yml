@@ -1,5 +1,10 @@
 appId: com.dohyeon5626.docent
 productName: Docent
+# We upload artifacts to GitHub Releases ourselves in the release workflow
+# (softprops/action-gh-release), so disable electron-builder's own publish —
+# otherwise it auto-detects CI + a matching git tag and tries to publish
+# itself, failing without a GH_TOKEN.
+publish: null
 directories:
   buildResources: build
   output: dist

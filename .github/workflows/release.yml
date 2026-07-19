@@ -1,17 +1,17 @@
 name: Release
 
-# Push a tag like "v1.2.0" to build the mac app and attach the .dmg/.pkg
-# to a GitHub Release for that tag (created automatically if it doesn't exist).
+# Fires when you publish a GitHub Release (for a tag like "v1.2.0").
+# Builds the mac app and attaches the .dmg/.pkg to that same release.
+# Only adds files — never touches the release's title or description.
 on:
-  push:
-    tags:
-      - 'v*'
+  release:
+    types: [published]
 
 permissions:
   contents: write
 
 jobs:
-  build-and-release:
+  build-and-attach:
     runs-on: macos-latest
     steps:
       - name: Checkout
@@ -31,10 +31,9 @@ jobs:
       - name: Build app (dmg + pkg)
         run: npm run build:mac
 
-      - name: Publish release
+      - name: Attach build artifacts to the release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             dist/*.dmg
             dist/*.pkg
-          generate_release_notes: true
