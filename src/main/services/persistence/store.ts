@@ -17,6 +17,22 @@ const projectsFile = (): string => path.join(dataRoot(), 'projects.json')
 const settingsFile = (): string => path.join(dataRoot(), 'settings.json')
 export const projectDir = (id: string): string => path.join(dataRoot(), 'projects', id)
 
+/**
+ * Copy an imported document into the project's own folder and return the new
+ * path. The original lives in the user's Desktop/Documents/Downloads, which are
+ * TCC-protected: reading from there re-triggers a macOS permission prompt on
+ * every relaunch. userData is unprotected, so once copied we never prompt again
+ * (and the project keeps working even if the user moves or deletes the source).
+ */
+export async function importSource(id: string, srcPath: string): Promise<string> {
+  const dir = projectDir(id)
+  await fs.mkdir(dir, { recursive: true })
+  const ext = path.extname(srcPath) || '.pdf'
+  const dest = path.join(dir, `source${ext}`)
+  await fs.copyFile(srcPath, dest)
+  return dest
+}
+
 async function readJson<T>(file: string, fallback: T): Promise<T> {
   try {
     return JSON.parse(await fs.readFile(file, 'utf-8')) as T

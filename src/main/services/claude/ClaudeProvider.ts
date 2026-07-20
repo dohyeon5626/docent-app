@@ -1,6 +1,8 @@
 import { spawn } from 'child_process'
+import { mkdirSync } from 'fs'
 import { homedir } from 'os'
 import path from 'path'
+import { app } from 'electron'
 import type { AIProvider, AIRequestOptions } from './AIProvider'
 
 type Lang = 'ko' | 'en'
@@ -58,9 +60,26 @@ export class ClaudeProvider implements AIProvider {
     return { ...process.env, PATH: `${process.env.PATH ?? ''}:${extra.join(':')}` }
   }
 
+  /**
+   * Working directory for the spawned CLI. Launched from Finder the app's cwd
+   * is "/", and the CLI treats its cwd as the workspace and scans it — which
+   * walks into ~/Desktop, ~/Downloads and ~/Music, making macOS prompt for each
+   * protected folder (and Apple Music / media library). Point it at an empty,
+   * non-protected folder under userData so there is nothing there to scan.
+   */
+  private cwd(): string {
+    const dir = path.join(app.getPath('userData'), 'claude-workspace')
+    try {
+      mkdirSync(dir, { recursive: true })
+    } catch {
+      // best-effort; fall through and let spawn use it anyway
+    }
+    return dir
+  }
+
   async checkAvailability(): Promise<{ available: boolean; version: string | null }> {
     return new Promise((resolve) => {
-      const child = spawn('claude', ['--version'], { env: this.env(), shell: false })
+      const child = spawn('claude', ['--version'], { env: this.env(), cwd: this.cwd(), shell: false })
       let out = ''
       child.stdout.on('data', (d) => (out += String(d)))
       child.on('error', () => resolve({ available: false, version: null }))
@@ -87,7 +106,7 @@ export class ClaudeProvider implements AIProvider {
       ]
       const model = this.getModel()
       if (model && model !== 'default') args.push('--model', model)
-      const child = spawn('claude', args, { env: this.env(), shell: false })
+      const child = spawn('claude', args, { env: this.env(), cwd: this.cwd(), shell: false })
 
       let full = ''
       let sawPartial = false

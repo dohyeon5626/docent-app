@@ -204,10 +204,15 @@ export function registerIpcHandlers(ai: AIProvider, windows: WindowManager): voi
       }
     ): Promise<Project> => {
       const now = new Date().toISOString()
+      const id = newId(10)
+      // Copy the source into the project folder so later reads never touch the
+      // user's protected folders (Desktop/Documents/Downloads) — that's what
+      // makes macOS re-prompt for file access on every relaunch.
+      const localPath = await store.importSource(id, pdfPath)
       const project: Project = {
-        id: newId(10),
+        id,
         name,
-        pdfPath,
+        pdfPath: localPath,
         createdAt: now,
         updatedAt: now,
         lastOpenedAt: null,
