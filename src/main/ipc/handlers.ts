@@ -19,11 +19,6 @@ import { analyzeProject, relocalizePlan } from '../services/pdf/AnalysisService'
 import { renderSummaryPdf } from '../services/pdf/SummaryPdfExporter'
 import * as store from '../services/persistence/store'
 import { buildAppMenu } from '../services/window/menu'
-import {
-  convertToPdf,
-  needsConversion,
-  SUPPORTED_EXTENSIONS
-} from '../services/pdf/DocumentImporter'
 import type { WindowManager } from '../services/window/WindowManager'
 
 export function registerIpcHandlers(ai: AIProvider, windows: WindowManager): void {
@@ -108,24 +103,10 @@ export function registerIpcHandlers(ai: AIProvider, windows: WindowManager): voi
     return { installed: available, version }
   })
 
-  /** Conversion (if needed) + analysis + summary pre-generation, with progress. */
+  /** Analysis + summary pre-generation, with progress. */
   const runProjectAnalysis = async (project: Project): Promise<void> => {
     const uiLang = windows.getSettings().language ?? 'ko'
     try {
-      if (needsConversion(project.pdfPath)) {
-        windows.broadcast(IPC.analysisProgress, {
-          projectId: project.id,
-          phase: 'reading-pdf',
-          progress: 0.01,
-          detail: uiLang === 'ko' ? 'PDF로 변환 중' : 'Converting to PDF'
-        } satisfies AnalysisProgress)
-        project.pdfPath = await convertToPdf(
-          project.pdfPath,
-          store.projectDir(project.id),
-          uiLang
-        )
-        await store.upsertProject(project)
-      }
       await analyzeProject(
         project,
         ai,
@@ -175,13 +156,8 @@ export function registerIpcHandlers(ai: AIProvider, windows: WindowManager): voi
 
   ipcMain.handle(IPC.pickPdf, async () => {
     const result = await dialog.showOpenDialog({
-      title: '문서 선택',
-      filters: [
-        { name: 'Documents', extensions: SUPPORTED_EXTENSIONS },
-        { name: 'PDF', extensions: ['pdf'] },
-        { name: 'Word', extensions: ['docx', 'doc'] },
-        { name: 'Pages', extensions: ['pages'] }
-      ],
+      title: 'PDF 선택',
+      filters: [{ name: 'PDF', extensions: ['pdf'] }],
       properties: ['openFile']
     })
     return result.canceled ? null : result.filePaths[0]

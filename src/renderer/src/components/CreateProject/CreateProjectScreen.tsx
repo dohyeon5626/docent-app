@@ -36,7 +36,7 @@ export default function CreateProjectScreen(): JSX.Element {
     const path = await window.api.pickPdf()
     if (path) {
       setPdfPath(path)
-      if (!name) setName(path.split('/').pop()?.replace(/\.(pdf|docx?|pages)$/i, '') ?? '')
+      if (!name) setName(path.split('/').pop()?.replace(/\.pdf$/i, '') ?? '')
     }
   }
 
