@@ -249,11 +249,14 @@ textarea:focus {
   border-right: 1px solid var(--hairline-soft);
   display: flex;
   flex-direction: column;
+  -webkit-app-region: drag;
 }
 .ij-side .traffic-space {
   height: 44px;
   flex-shrink: 0;
-  -webkit-app-region: drag;
+}
+.ij-nav-item {
+  -webkit-app-region: no-drag;
 }
 .ij-app {
   display: flex;
@@ -311,7 +314,9 @@ textarea:focus {
   -webkit-app-region: drag;
   border-bottom: 1px solid var(--hairline-soft);
 }
-.ij-topbar > * {
+.ij-topbar button,
+.ij-topbar input,
+.ij-topbar a {
   -webkit-app-region: no-drag;
 }
 .ij-search {
