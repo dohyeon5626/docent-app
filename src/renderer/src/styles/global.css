@@ -14,9 +14,9 @@
   --text: #1d1d1f;
   --text-dim: #6e6e73;
   --text-faint: #aeaeb2;
-  --accent: #3574d4;
-  --accent-hover: #2c65bb;
-  --tint: rgba(53, 116, 212, 0.09);
+  --accent: #2563eb;
+  --accent-hover: #1d4ed8;
+  --tint: rgba(37, 99, 235, 0.09);
   --hover: rgba(0, 0, 0, 0.045);
   --active: rgba(0, 0, 0, 0.08);
   --card: #ffffff;
@@ -38,9 +38,9 @@
     --text: #f5f5f7;
     --text-dim: #98989d;
     --text-faint: #636366;
-    --accent: #6ca4e8;
-    --accent-hover: #83b3ec;
-    --tint: rgba(108, 164, 232, 0.14);
+    --accent: #4f8ef7;
+    --accent-hover: #6ba5f9;
+    --tint: rgba(79, 142, 247, 0.14);
     --hover: rgba(255, 255, 255, 0.06);
     --active: rgba(255, 255, 255, 0.1);
     --card: #2a2a2d;
