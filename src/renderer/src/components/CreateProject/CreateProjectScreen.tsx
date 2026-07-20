@@ -48,7 +48,7 @@ export default function CreateProjectScreen(): JSX.Element {
   return (
     <div className="welcome">
       <div className="drag-strip" />
-      <div className="center-screen" style={{ justifyContent: 'flex-start', paddingTop: 48 }}>
+      <div className="center-screen">
         <div className="form-card">
           {!progress && (
             <>

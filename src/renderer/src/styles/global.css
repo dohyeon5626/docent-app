@@ -218,11 +218,14 @@ textarea:focus {
 .center-screen {
   flex: 1;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  /* "safe" keeps the box centered when it fits, but falls back to start
+     instead of clipping the top/left when the content is taller/wider than
+     the viewport. */
+  align-items: safe center;
+  justify-content: safe center;
   flex-direction: column;
   gap: 12px;
-  padding: 40px;
+  padding: 28px 40px;
   overflow-y: auto;
 }
 
@@ -233,6 +236,15 @@ textarea:focus {
   display: flex;
   flex-direction: column;
   background: var(--bg);
+  position: relative;
+}
+/* The drag strip overlays the top instead of consuming layout height, so the
+   centered content is centered in the whole window (not the area below it). */
+.welcome > .drag-strip {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
 }
 
 /* ============ project list (IntelliJ welcome style) ============ */
