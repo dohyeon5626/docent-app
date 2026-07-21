@@ -1,6 +1,6 @@
 {
   "name": "claude-pdf-learn",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "productName": "Docent",
   "description": "AI-powered desktop application for learning PDFs with Claude Code CLI.",
   "main": "./out/main/index.js",

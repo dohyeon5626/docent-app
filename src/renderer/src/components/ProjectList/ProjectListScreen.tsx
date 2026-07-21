@@ -5,7 +5,7 @@ import { useAppStore } from '../../store/appStore'
 import { IconTrash } from '../icons'
 import AppLogo from '../AppLogo'
 
-const APP_VERSION = '1.0.0'
+const APP_VERSION = '1.0.1'
 
 function relativeDate(iso: string | null, t: ReturnType<typeof useT>): string {
   if (!iso) return t('date.beforeStudy')
