@@ -145,6 +145,59 @@ function unionRect(rects: HighlightRect[]): HighlightRect {
   return { x: x1 - 6, y: y1 - 6, w: x2 - x1 + 12, h: y2 - y1 + 12 }
 }
 
+/** Renders one page to its own canvas. Mounted only while near the viewport. */
+function PageCanvas({
+  doc,
+  page,
+  scale,
+  width,
+  height
+}: {
+  doc: PDFDocumentProxy | null
+  page: number
+  scale: number
+  width: number
+  height: number
+}): JSX.Element {
+  const ref = useRef<HTMLCanvasElement>(null)
+  useEffect(() => {
+    if (!doc || scale <= 0) return
+    let cancelled = false
+    let task: { promise: Promise<void>; cancel: () => void } | null = null
+    void (async () => {
+      try {
+        const pdfPage = await doc.getPage(page)
+        if (cancelled) return
+        const dpr = window.devicePixelRatio || 1
+        const viewport = pdfPage.getViewport({ scale: scale * dpr })
+        const canvas = ref.current
+        if (!canvas) return
+        canvas.width = viewport.width
+        canvas.height = viewport.height
+        const ctx = canvas.getContext('2d')
+        if (!ctx) return
+        task = pdfPage.render({ canvasContext: ctx, viewport })
+        await task.promise
+      } catch {
+        // cancellation is expected while scrolling/zooming quickly
+      }
+    })()
+    return () => {
+      cancelled = true
+      try {
+        task?.cancel()
+      } catch {
+        // already settled
+      }
+    }
+  }, [doc, page, scale])
+  return <canvas ref={ref} style={{ width, height, display: 'block' }} />
+}
+
+const GAP = 14 // vertical space between stacked pages
+const PAD = 16 // top/bottom padding of the scroll column
+const BUFFER = 2 // extra pages rendered above/below the viewport
+
 export default function PdfViewer(): JSX.Element {
   const paneRole = useAppStore((s) => s.paneRole)
   const activeProject = useAppStore((s) => s.activeProject)
@@ -156,35 +209,96 @@ export default function PdfViewer(): JSX.Element {
   const revealStep = useAppStore((s) => s.revealStep)
   const setWindowMode = useAppStore((s) => s.setWindowMode)
 
-  const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const docRef = useRef<PDFDocumentProxy | null>(null)
-  const renderTaskRef = useRef<{ cancel: () => void } | null>(null)
   const baseSizeRef = useRef({ w: 0, h: 0 }) // page size at scale 1
   const [totalPages, setTotalPages] = useState(0)
   const [scale, setScale] = useState(0) // 0 = initial fit pending
   const [pageInput, setPageInput] = useState('1')
   const [error, setError] = useState<string | null>(null)
+  const [range, setRange] = useState({ start: 1, end: 1 })
   const t = useT()
-  const [highlights, setHighlights] = useState<{ nonce: number; rects: HighlightRect[] }>({
-    nonce: 0,
-    rects: []
-  })
+  const [highlights, setHighlights] = useState<{
+    nonce: number
+    page: number
+    rects: HighlightRect[]
+  }>({ nonce: 0, page: 0, rects: [] })
   const appliedHighlightRef = useRef(0)
   const clickStartRef = useRef<{ x: number; y: number } | null>(null)
 
-  // 'height' (default: whole page visible) | 'width' | null (manual zoom)
-  const fitModeRef = useRef<'height' | 'width' | null>('height')
+  // 'page' (default: whole page fits within both width and height; pages then
+  // stack and scroll continuously) | 'width' | 'height' | null (manual zoom)
+  const fitModeRef = useRef<'page' | 'height' | 'width' | null>('page')
 
-  const fitTo = useCallback((mode: 'height' | 'width'): void => {
+  const currentPageRef = useRef(currentPage)
+  currentPageRef.current = currentPage
+  const scrollDrivenPageRef = useRef(0) // last page set from scrolling
+  const programmaticRef = useRef(false) // suppress the scroll handler during scrollToPage
+  const scrollRafRef = useRef(0)
+
+  const pageW = baseSizeRef.current.w * scale
+  const pageH = baseSizeRef.current.h * scale
+  const innerHeight =
+    totalPages > 0 && pageH > 0 ? PAD * 2 + totalPages * pageH + (totalPages - 1) * GAP : 0
+  const offsetOf = useCallback(
+    (n: number): number => PAD + (Math.min(Math.max(n, 1), totalPages) - 1) * (pageH + GAP),
+    [pageH, totalPages]
+  )
+
+  const fitTo = useCallback((mode: 'page' | 'height' | 'width'): void => {
     const wrap = wrapRef.current
     const { w, h } = baseSizeRef.current
     if (!wrap || !w || !h) return
     fitModeRef.current = mode
-    const target =
-      mode === 'height' ? (wrap.clientHeight - 36) / h : (wrap.clientWidth - 48) / w
+    const fitW = (wrap.clientWidth - 48) / w
+    const fitH = (wrap.clientHeight - 36) / h
+    // 'width' fills the pane and reads as a continuous scroll; 'page' contains
+    // the whole page (a wide/landscape page fits instead of overflowing).
+    const target = mode === 'width' ? fitW : mode === 'height' ? fitH : Math.min(fitW, fitH)
     setScale(Math.min(3, Math.max(0.3, +target.toFixed(3))))
   }, [])
+
+  // recompute which pages are near the viewport (virtualized rendering)
+  const updateRange = useCallback((): void => {
+    const wrap = wrapRef.current
+    if (!wrap || pageH <= 0 || totalPages === 0) return
+    const u = pageH + GAP
+    const start = Math.max(1, Math.floor((wrap.scrollTop - PAD) / u) + 1 - BUFFER)
+    const end = Math.min(totalPages, Math.floor((wrap.scrollTop + wrap.clientHeight - PAD) / u) + 1 + BUFFER)
+    setRange((r) => (r.start === start && r.end === end ? r : { start, end }))
+  }, [pageH, totalPages])
+
+  const onScroll = useCallback((): void => {
+    cancelAnimationFrame(scrollRafRef.current)
+    scrollRafRef.current = requestAnimationFrame(() => {
+      updateRange()
+      const wrap = wrapRef.current
+      if (!wrap || programmaticRef.current || pageH <= 0 || totalPages === 0) return
+      const u = pageH + GAP
+      const cur = Math.min(
+        totalPages,
+        Math.max(1, Math.floor((wrap.scrollTop + wrap.clientHeight * 0.35 - PAD) / u) + 1)
+      )
+      if (cur !== currentPageRef.current) {
+        scrollDrivenPageRef.current = cur
+        setPage(cur)
+      }
+    })
+  }, [updateRange, pageH, totalPages, setPage])
+
+  const scrollToPage = useCallback(
+    (n: number): void => {
+      const wrap = wrapRef.current
+      if (!wrap || pageH <= 0) return
+      programmaticRef.current = true
+      wrap.scrollTop = offsetOf(n)
+      requestAnimationFrame(() => {
+        programmaticRef.current = false
+        updateRange()
+      })
+    },
+    [pageH, offsetOf, updateRange]
+  )
 
   // keep the fit across pane resizes until the user zooms manually
   useEffect(() => {
@@ -229,7 +343,7 @@ export default function PdfViewer(): JSX.Element {
         baseSizeRef.current = { w: vp.width, h: vp.height }
         first.cleanup()
         setTotalPages(doc.numPages)
-        fitTo('height')
+        fitTo('page')
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : String(err))
       }
@@ -239,47 +353,33 @@ export default function PdfViewer(): JSX.Element {
       void docRef.current?.destroy()
       docRef.current = null
       baseSizeRef.current = { w: 0, h: 0 }
-      fitModeRef.current = 'height'
+      fitModeRef.current = 'page'
       setTotalPages(0)
       setScale(0)
+      setRange({ start: 1, end: 1 })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeProject?.id, activeProject?.pdfPath])
 
-  // render current page
+  // on scale change (zoom / fit / resize): re-layout and keep the page in view
+  useEffect(() => {
+    if (scale <= 0 || totalPages === 0) return
+    updateRange()
+    scrollToPage(currentPageRef.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scale, totalPages])
+
+  // external page change (anchor / page input / prev-next) → scroll into view
+  useEffect(() => {
+    if (scale <= 0 || totalPages === 0) return
+    if (currentPage === scrollDrivenPageRef.current) return
+    scrollToPage(currentPage)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage])
+
   useEffect(() => {
     setPageInput(String(currentPage))
-    const doc = docRef.current
-    const canvas = canvasRef.current
-    if (!doc || !canvas || totalPages === 0 || scale === 0) return
-    const page = Math.min(Math.max(currentPage, 1), totalPages)
-    let cancelled = false
-    void (async () => {
-      try {
-        const pdfPage = await doc.getPage(page)
-        if (cancelled) return
-        renderTaskRef.current?.cancel()
-        const viewport = pdfPage.getViewport({ scale: scale * window.devicePixelRatio })
-        canvas.width = viewport.width
-        canvas.height = viewport.height
-        canvas.style.width = `${viewport.width / window.devicePixelRatio}px`
-        canvas.style.height = `${viewport.height / window.devicePixelRatio}px`
-        const ctx = canvas.getContext('2d')
-        if (!ctx) return
-        const task = pdfPage.render({ canvasContext: ctx, viewport })
-        renderTaskRef.current = task
-        await task.promise
-      } catch (err) {
-        // cancellation is expected when pages change quickly
-        if (!cancelled && !(err instanceof Error && err.name === 'RenderingCancelledException')) {
-          setError(err instanceof Error ? err.message : String(err))
-        }
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [currentPage, scale, totalPages])
+  }, [currentPage])
 
   const go = useCallback(
     (page: number): void => {
@@ -287,49 +387,6 @@ export default function PdfViewer(): JSX.Element {
       setPage(Math.min(Math.max(page, 1), totalPages))
     },
     [totalPages, setPage]
-  )
-
-  // ----- trackpad / wheel page flipping -----
-  const wheelStateRef = useRef({ accY: 0, accX: 0, lastFlip: 0 })
-  const currentPageRef = useRef(currentPage)
-  currentPageRef.current = currentPage
-
-  const onWheel = useCallback(
-    (e: React.WheelEvent): void => {
-      const el = wrapRef.current
-      if (!el || totalPages < 2) return
-      const st = wheelStateRef.current
-      const now = Date.now()
-      if (now - st.lastFlip < 450) return
-
-      const flip = (dir: 1 | -1): void => {
-        st.lastFlip = now
-        st.accY = 0
-        st.accX = 0
-        go(currentPageRef.current + dir)
-        el.scrollTop = dir === 1 ? 0 : el.scrollHeight
-      }
-
-      // horizontal two-finger swipe
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) * 1.5) {
-        st.accX += e.deltaX
-        if (st.accX > 150) flip(1)
-        else if (st.accX < -150) flip(-1)
-        return
-      }
-      // vertical scroll: flip when the page can't scroll further
-      const canScroll = el.scrollHeight > el.clientHeight + 4
-      const atTop = el.scrollTop <= 1
-      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1
-      if (!canScroll || (e.deltaY > 0 && atBottom) || (e.deltaY < 0 && atTop)) {
-        st.accY += e.deltaY
-        if (st.accY > 160) flip(1)
-        else if (st.accY < -160) flip(-1)
-      } else {
-        st.accY = 0
-      }
-    },
-    [go, totalPages]
   )
 
   // ----- keyboard navigation -----
@@ -346,7 +403,6 @@ export default function PdfViewer(): JSX.Element {
           break
         case 'ArrowRight':
         case 'PageDown':
-        case ' ':
           e.preventDefault()
           go(currentPageRef.current + 1)
           break
@@ -364,63 +420,64 @@ export default function PdfViewer(): JSX.Element {
     return () => window.removeEventListener('keydown', onKey)
   }, [go, totalPages])
 
-  // ----- clicking the page reveals its summary section on the right -----
+  // ----- clicking a page reveals its summary section on the right -----
   // a section "owns" a page in proportion to how often its summary actually
   // cites it ([p:N] anchors count more than coarse plan page ranges), so the
   // most-specific section wins instead of a broad overview section
-  const onCanvasClick = useCallback((): void => {
-    if (!plan) return
-    const page = currentPageRef.current
-    const conversation = useAppStore.getState().conversation
-    const scored = plan.steps.map((step) => {
-      const study = conversation.find(
-        (e) => e.role === 'assistant' && e.kind === 'study' && e.stepId === step.id
-      )
-      let citations = 0
-      const cited: number[] = []
-      if (study) {
-        for (const m of study.text.matchAll(/\[p:(\d+)\]/gi)) {
-          const p = Number(m[1])
-          cited.push(p)
-          if (p === page) citations++
+  const revealForPage = useCallback(
+    (page: number): void => {
+      if (!plan) return
+      const conversation = useAppStore.getState().conversation
+      const scored = plan.steps.map((step) => {
+        const study = conversation.find(
+          (e) => e.role === 'assistant' && e.kind === 'study' && e.stepId === step.id
+        )
+        let citations = 0
+        const cited: number[] = []
+        if (study) {
+          for (const m of study.text.matchAll(/\[p:(\d+)\]/gi)) {
+            const p = Number(m[1])
+            cited.push(p)
+            if (p === page) citations++
+          }
         }
-      }
-      const planHit = step.pages.includes(page) ? 1 : 0
-      const allPages = [...step.pages, ...cited]
-      const span =
-        allPages.length > 0 ? Math.max(...allPages) - Math.min(...allPages) + 1 : Infinity
-      const minPage = allPages.length > 0 ? Math.min(...allPages) : Infinity
-      return { step, score: citations * 2 + planHit, span, minPage }
-    })
+        const planHit = step.pages.includes(page) ? 1 : 0
+        const allPages = [...step.pages, ...cited]
+        const span =
+          allPages.length > 0 ? Math.max(...allPages) - Math.min(...allPages) + 1 : Infinity
+        const minPage = allPages.length > 0 ? Math.min(...allPages) : Infinity
+        return { step, score: citations * 2 + planHit, span, minPage }
+      })
 
-    const hits = scored
-      .filter((s) => s.score > 0)
-      .sort((a, b) => b.score - a.score || a.span - b.span)
-    let target = hits[0]?.step
-    if (!target) {
-      // nearest section that starts at or before this page
-      const before = scored
-        .filter((s) => s.minPage <= page)
-        .sort((a, b) => b.minPage - a.minPage)
-      target = before[0]?.step ?? plan.steps[0]
-    }
-    if (target) revealStep(target.id)
-  }, [plan, revealStep])
+      const hits = scored
+        .filter((s) => s.score > 0)
+        .sort((a, b) => b.score - a.score || a.span - b.span)
+      let target = hits[0]?.step
+      if (!target) {
+        const before = scored
+          .filter((s) => s.minPage <= page)
+          .sort((a, b) => b.minPage - a.minPage)
+        target = before[0]?.step ?? plan.steps[0]
+      }
+      if (target) revealStep(target.id)
+    },
+    [plan, revealStep]
+  )
 
   // ----- spotlight the region a clicked summary sentence came from -----
   useEffect(() => {
     const req = highlightRequest
     const doc = docRef.current
-    if (!req || !doc || req.nonce === appliedHighlightRef.current) return
-    if (req.page !== currentPage || scale === 0) return
+    if (!req || !doc || req.nonce === appliedHighlightRef.current || scale <= 0) return
     appliedHighlightRef.current = req.nonce
+    scrollToPage(req.page)
     let cancelled = false
     void (async () => {
       try {
         const page = await doc.getPage(req.page)
         const rects = await findHighlightRects(page, scale, req.query)
         if (!cancelled && rects.length > 0) {
-          setHighlights({ nonce: req.nonce, rects })
+          setHighlights({ nonce: req.nonce, page: req.page, rects })
           setTimeout(() => {
             if (!cancelled) setHighlights((h) => (h.nonce === req.nonce ? { ...h, rects: [] } : h))
           }, 1500)
@@ -432,9 +489,12 @@ export default function PdfViewer(): JSX.Element {
     return () => {
       cancelled = true
     }
-  }, [highlightRequest, currentPage, scale])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightRequest, scale])
 
   const separate = settings?.windowMode === 'separate'
+  const pages: number[] = []
+  if (pageH > 0) for (let p = range.start; p <= range.end; p++) pages.push(p)
 
   return (
     <>
@@ -493,8 +553,9 @@ export default function PdfViewer(): JSX.Element {
         <PaneMenu
           title="Options"
           items={[
-            { label: t('menu.fitH'), onClick: () => fitTo('height') },
+            { label: t('menu.fitPage'), onClick: () => fitTo('page') },
             { label: t('menu.fitW'), onClick: () => fitTo('width') },
+            { label: t('menu.fitH'), onClick: () => fitTo('height') },
             {
               label: t('menu.actual'),
               onClick: () => {
@@ -513,7 +574,7 @@ export default function PdfViewer(): JSX.Element {
       <div
         className="pdf-canvas-wrap"
         ref={wrapRef}
-        onWheel={onWheel}
+        onScroll={onScroll}
         onMouseDown={(e) => {
           clickStartRef.current = { x: e.clientX, y: e.clientY }
         }}
@@ -521,30 +582,44 @@ export default function PdfViewer(): JSX.Element {
           // ignore drags/pans — only treat stationary clicks as "reveal"
           const start = clickStartRef.current
           if (start && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 6) return
-          onCanvasClick()
+          const el = (e.target as HTMLElement).closest('.pdf-page') as HTMLElement | null
+          revealForPage(el ? Number(el.dataset.page) : currentPageRef.current)
         }}
       >
         {error ? (
-          <div className="error-banner">{t('pdf.openFailed')}: {error}</div>
+          <div className="error-banner">
+            {t('pdf.openFailed')}: {error}
+          </div>
         ) : (
-          <div className="canvas-holder">
-            <canvas ref={canvasRef} />
-            {highlights.rects.length > 0 && (
+          <div className="pdf-scroll-inner" style={{ height: innerHeight, width: pageW || undefined }}>
+            {pages.map((p) => (
               <div
-                key={`ring-${highlights.nonce}`}
-                className="pdf-spot-ring"
-                style={(() => {
-                  const u = unionRect(highlights.rects)
-                  return { left: u.x, top: u.y, width: u.w, height: u.h }
-                })()}
-              />
-            )}
-            {highlights.rects.map((r, i) => (
-              <div
-                key={`${highlights.nonce}-${i}`}
-                className="pdf-spot-line"
-                style={{ left: r.x, top: r.y, width: r.w, height: r.h }}
-              />
+                key={p}
+                className="pdf-page"
+                data-page={p}
+                style={{ top: offsetOf(p), width: pageW, height: pageH }}
+              >
+                <PageCanvas doc={docRef.current} page={p} scale={scale} width={pageW} height={pageH} />
+                {highlights.page === p && highlights.rects.length > 0 && (
+                  <>
+                    <div
+                      key={`ring-${highlights.nonce}`}
+                      className="pdf-spot-ring"
+                      style={(() => {
+                        const u = unionRect(highlights.rects)
+                        return { left: u.x, top: u.y, width: u.w, height: u.h }
+                      })()}
+                    />
+                    {highlights.rects.map((r, i) => (
+                      <div
+                        key={`${highlights.nonce}-${i}`}
+                        className="pdf-spot-line"
+                        style={{ left: r.x, top: r.y, width: r.w, height: r.h }}
+                      />
+                    ))}
+                  </>
+                )}
+              </div>
             ))}
           </div>
         )}

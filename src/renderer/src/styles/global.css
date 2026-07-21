@@ -809,17 +809,19 @@ code.block {
 .pdf-canvas-wrap {
   flex: 1;
   overflow: auto;
-  display: flex;
-  justify-content: safe center;
-  align-items: flex-start;
-  padding: 20px;
   background: var(--canvas-bg);
 }
-.pdf-canvas-wrap .canvas-holder {
+/* the pages stack vertically and scroll continuously; only the pages near the
+   viewport are actually mounted (virtualized), positioned by absolute top. */
+.pdf-scroll-inner {
   position: relative;
-  flex-shrink: 0;
+  margin: 0 auto;
 }
-.pdf-canvas-wrap canvas {
+.pdf-page {
+  position: absolute;
+  left: 0;
+}
+.pdf-page canvas {
   display: block;
   box-shadow:
     0 0 0 0.5px rgba(0, 0, 0, 0.1),
